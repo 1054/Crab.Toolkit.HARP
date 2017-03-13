@@ -1,0 +1,170 @@
+! 
+! 
+! Usage:
+!     @gildas-class-autoclick
+! 
+
+
+! 
+! Prepare
+! 
+IF (.NOT.EXIST(findquality)) DEFINE DOUBLE findquality
+IF (.NOT.EXIST(findfirst)) DEFINE LONG findfirst
+IF (.NOT.EXIST(findlast)) DEFINE LONG findlast
+
+
+
+! 
+! User-define
+! 
+!LET name converted_20151210_combined_tagged
+let findquality 9
+!set mode x 352550 353450
+!set mode y -0.1 0.1
+!set observatory JCMT -155:28:46.4 +19:49:33.8 4120
+
+
+! 
+! FILE
+! 
+file update 'name'
+find /quality findquality
+if (found.EQ.0) return
+get last
+let findlast = number
+get first
+let findfirst = number
+
+
+! 
+! DEFS
+! 
+DEFINE REAL diff_x diff_y diff_k
+DEFINE REAL doClick_Button0X doClick_Button0Y 
+DEFINE REAL doClick_Button1X doClick_Button1Y 
+DEFINE REAL doClick_Button2X doClick_Button2Y 
+DEFINE REAL doClick_ButtonDX doClick_ButtonDY
+LET doClick_Button0X = 17.2
+LET doClick_Button0Y = 2.96
+LET doClick_Button1X = 21.2
+LET doClick_Button1Y = 2.96
+LET doClick_Button2X = 24.2 
+LET doClick_Button2Y = 2.96
+LET doClick_ButtonDX = 1.2
+LET doClick_ButtonDY = 0.6
+
+
+! 
+! LOOP
+! 
+FOR /WHILE (.true.) ! Infinite loop
+    
+    SAY " "
+    SAY "--- "
+    SAY "Click mouse for operations. "
+    SAY "Press key E or Q to quit. "
+    SAY "Press key N for next scan, P for previous scan. "
+    SAY "Press number key 1 2 3 4 5 6 7 8 9 to tag from excellent to useless. "
+    SAY "--- "
+    SAY " "
+    
+    get 'number'
+    
+    SAY ""
+    EXAM quality
+    SAY ""
+    
+    smooth box 8 !<TODO>! smooth will copy R buffeer into T buffer
+    
+    plot
+    
+    PEN 6
+    !LET character_size = character_size*2
+    IF (number.GE.findfirst) GREG\DRAW TEXT     'doClick_Button0X-BOX_XMIN'                  'doClick_Button0Y-BOX_YMIN' "Scan:"'number'"/"'findlast' 2 ! 'number'"/"'found'
+    IF (number.GE.findfirst) GREG\DRAW TEXT     'doClick_Button0X-BOX_XMIN'                  'doClick_Button0Y-BOX_YMIN' "Quality:"'quality' 8
+    IF (number.GT.findfirst) GREG\DRAW TEXT     'doClick_Button1X-BOX_XMIN'                  'doClick_Button1Y-BOX_YMIN' "PREV" 5
+    IF (number.LT.findlast)  GREG\DRAW TEXT     'doClick_Button2X-BOX_XMIN'                  'doClick_Button2Y-BOX_YMIN' "NEXT" 5
+                             GREG\DRAW RELOCATE 'doClick_Button1X-BOX_XMIN-doClick_ButtonDX' 'doClick_Button1Y-BOX_YMIN-doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button1X-BOX_XMIN-doClick_ButtonDX' 'doClick_Button1Y-BOX_YMIN+doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button1X-BOX_XMIN+doClick_ButtonDX' 'doClick_Button1Y-BOX_YMIN+doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button1X-BOX_XMIN+doClick_ButtonDX' 'doClick_Button1Y-BOX_YMIN-doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button1X-BOX_XMIN-doClick_ButtonDX' 'doClick_Button1Y-BOX_YMIN-doClick_ButtonDY'
+                             GREG\DRAW RELOCATE 'doClick_Button2X-BOX_XMIN-doClick_ButtonDX' 'doClick_Button2Y-BOX_YMIN-doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button2X-BOX_XMIN-doClick_ButtonDX' 'doClick_Button2Y-BOX_YMIN+doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button2X-BOX_XMIN+doClick_ButtonDX' 'doClick_Button2Y-BOX_YMIN+doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button2X-BOX_XMIN+doClick_ButtonDX' 'doClick_Button2Y-BOX_YMIN-doClick_ButtonDY'
+                             GREG\DRAW LINE     'doClick_Button2X-BOX_XMIN-doClick_ButtonDX' 'doClick_Button2Y-BOX_YMIN-doClick_ButtonDY'
+    !LET character_size = character_size/2
+    PEN 0
+    
+    
+    GREG\DRAW RELCOATE
+    
+    
+    LET diff_k = 0.0
+    LET diff_x = ABS(PHY_CURS[1]-doClick_Button1X)
+    LET diff_y = ABS(PHY_CURS[2]-doClick_Button1Y)
+    IF (diff_x.LT.doClick_ButtonDX).AND.(diff_y.LT.doClick_ButtonDY) LET diff_k = -99 ! PREV BUTTON CLICKED !
+    LET diff_x = ABS(PHY_CURS[1]-doClick_Button2X)
+    LET diff_y = ABS(PHY_CURS[2]-doClick_Button2Y)
+    IF (diff_x.LT.doClick_ButtonDX).AND.(diff_y.LT.doClick_ButtonDY) LET diff_k = +99 ! NEXT BUTTON CLICKED !
+    
+    
+    !EXAM cursor_code
+    
+    IF (cursor_code.EQ."N") LET diff_k = +99 ! NEXT
+    IF (cursor_code.EQ."P") LET diff_k = -99 ! PREV
+    
+    IF (cursor_code.EQ."E") BREAK
+    IF (cursor_code.EQ."Q") BREAK
+    
+    IF ((cursor_code.EQ."1").OR.(cursor_code.EQ."2").OR.(cursor_code.EQ."3").OR.(cursor_code.EQ."4").OR.(cursor_code.EQ."5").OR.(cursor_code.EQ."6").OR.(cursor_code.EQ."7").OR.(cursor_code.EQ."8").OR.(cursor_code.EQ."9").OR.(cursor_code.EQ."0")) THEN
+        
+        IF (cursor_code.NE."9") THEN
+            
+            SWAP ! copy T buffer to R buffer, T buffer is unsmoothed. 
+            TAG 'cursor_code'
+            SAY ""
+            EXAM quality
+            SAY ""
+            UPDATE
+            FILE UPDATE 'name'
+            FIND /quality findquality !<TODO>!
+            !SWAP
+            
+        ENDIF
+        
+    ELSE
+        
+        !EXAM cursor_code
+        !EXAM number
+        
+        !EXAM diff_k
+        !EXAM diff_x diff_y
+        !EXAM PHY_CURS PIX_CURS USE_CURS
+        
+        IF (diff_k.LT.-10) THEN
+           IF (number.GT.findfirst) THEN 
+               SAY "PREV! "
+               get prev
+           ELSE 
+               SAY "--- "
+               SAY "NO MORE!"
+               SAY "--- "
+           ENDIF
+        ELSE IF (diff_k.GT.+10) THEN
+           IF (number.LT.findlast) THEN 
+               SAY "NEXT! "
+               get next
+           ELSE 
+               SAY "--- "
+               SAY "NO MORE!"
+               SAY "--- "
+           ENDIF
+        ENDIF
+        
+    ENDIF
+    
+    
+    
+NEXT

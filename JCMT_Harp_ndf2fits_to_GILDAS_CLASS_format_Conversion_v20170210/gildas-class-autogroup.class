@@ -1,0 +1,69 @@
+! 
+! @gildas-class-autogroup
+! 
+! Loop spectra and group by OFF_LAMBDA, OFF_BETA
+! 
+! 
+
+! 
+! User-defined
+! 
+!FILE IN aaa.30m
+!FIND
+
+IF (.NOT.EXIST(group_off_lambda)) DEFINE double  group_off_lambda[256]
+IF (.NOT.EXIST(group_off_beta))   DEFINE double  group_off_beta[256]
+IF (.NOT.EXIST(group_off_tol))    DEFINE double  group_off_tol
+IF (.NOT.EXIST(group_off))        DEFINE double  group_off
+IF (.NOT.EXIST(group_id))         DEFINE integer group_id[256]
+IF (.NOT.EXIST(group_i))          DEFINE integer group_i
+IF (.NOT.EXIST(group_num))        DEFINE integer group_num
+
+
+FOR i 1 TO 256
+    LET group_id[i] = -99
+NEXT
+
+LET group_off_tol = 2.5 ! tolerant offset in arcsec
+LET group_num = 0 ! number of groups
+
+
+! 
+! 
+FOR j 1 TO FOUND
+    GET j
+    LET group_i = -99
+    FOR i 1 TO 256
+        IF (group_id[i].NE.-99) THEN
+            LET group_off = 'sqrt((group_off_lambda[i]-off_lambda)**2 + (group_off_beta[i]-off_beta)**2)'
+            IF (group_off.LE.group_off_tol) THEN
+                LET group_i = i
+                BREAK
+            END IF
+        ELSE 
+            LET group_i = i
+            BREAK
+        END IF
+    NEXT
+    ! 
+    IF (group_id[group_i].GT.0) THEN
+        LET group_off_lambda[group_i] = '(group_off_lambda[group_i] + off_lambda)/2.0'
+        LET group_off_beta[group_i] = '(group_off_beta[group_i] + off_beta)/2.0'
+        SAY "Matching group "'group_i'
+    ELSE 
+        LET group_id[group_i] = group_i
+        LET group_off_lambda[group_i] = off_lambda
+        LET group_off_beta[group_i] = off_beta
+        LET group_num = 'group_num + 1'
+        SAY "Creating group "'group_i'" off_lambda "'off_lambda'" off_beta "'off_beta'
+    END IF
+    ! 
+    !IF j.GT.250 BREAK
+NEXT
+
+SAY " "
+SAY "Created "'group_num'" groups!"
+SAY " "
+
+
+

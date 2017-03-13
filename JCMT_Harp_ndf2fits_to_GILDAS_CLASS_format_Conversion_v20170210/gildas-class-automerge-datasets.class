@@ -1,0 +1,122 @@
+! 
+! @gildas-class-automerge-datasets
+! 
+! simply merge all 30m data files
+! 
+! 
+
+! 
+! User-defined
+! 
+LET NAME b_receptors_class_tagged
+LET LINE CO(3-2)
+LET FREQUENCY 345.796
+LET VELOCITY 200 ! expected line velocity width in km/s
+LET LAMBDA 11.888623
+LET BETA -25.287563
+
+! 
+! Auto-define
+! 
+IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename
+LET filename 'NAME'
+IF (.NOT.EXIST(linename)) DEFINE CHAR*12 linename
+LET linename 'LINE'
+IF (.NOT.EXIST(linefreq)) DEFINE double linefreq
+LET linefreq 'FREQUENCY'
+IF (.NOT.EXIST(linewidth)) DEFINE double linewidth
+LET linewidth 'VELOCITY/2.99792458e5*linefreq' ! line width in GHz
+IF (.NOT.EXIST(sourcera)) DEFINE double sourcera
+LET sourcera 'LAMBDA'
+IF (.NOT.EXIST(sourcedec)) DEFINE double sourcedec
+LET sourcedec 'BETA'
+IF (.NOT.EXIST(j)) DEFINE integer j
+LET j 1
+
+IF (.NOT.EXIST(autoFlagEdgeChanLeft))  DEFINE DOUBLE autoFlagEdgeChanLeft
+IF (.NOT.EXIST(autoFlagEdgeChanRight)) DEFINE DOUBLE autoFlagEdgeChanRight
+LET autoFlagEdgeChanLeft 30
+LET autoFlagEdgeChanRight 30
+
+! 
+! Merge 30m data, 
+! Input file names must be c'j'.30m"
+! Output file name will be d.30m"
+! 
+file out d.30m single /overwrite
+for /while .true.
+  sic find c'j'.30m
+  if DIR%NFILE.EQ.0 then
+    break
+  endif
+  say "Reading c"'j'".30m"
+  file in c'j'
+  find
+  for i 1 to found
+    
+    get i; pl
+    !<Note> set window only accepts velocity, and needs to set unit V then set unit F back
+    !say window '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth*1e3/2.0-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    !set window '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth*1e3/2.0-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    set unit V
+    !<20160905>!!fixed below for NGC0253 CO(3-2)
+    !<20160905>!say window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    !<20160905>!set window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    say window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/(R%HEAD%SPE%FRES)*(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/(R%HEAD%SPE%FRES)*(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    set window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-30)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/(R%HEAD%SPE%FRES)*(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/(R%HEAD%SPE%FRES)*(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    set unit F
+    draw window
+    base /continuum /pl ! /continuum
+    
+    get i; pl
+    base last /pl
+    draw window
+    draw text 15 3 "rms="'R%HEAD%BAS%SIGFI'
+    
+    modify position 'sourcera/360*24' 'sourcedec' ! TODO: source RA Dec degree
+    smooth box 16
+    resample 1024 512 'linefreq*1e3' 0.9 FREQUENCY ! TODO: channel number 1024, channel ref 512, channel width 0.9MHz
+    write
+  next
+  let j 'j+1'
+next
+
+! 
+! make gridded map
+! 
+file in d
+find
+let name d_cube
+let type lmv
+table 'name' new /FREQUENCY 'linename' 'linefreq*1e3'
+xy_map 'name'
+!go view
+!hardcopy 'name'.hardcopy.eps /overwrite
+
+
+! 
+! make better gridded map
+! 
+file in d
+find
+consist /NOCHECK OFF
+list /toc quality
+find /quality 4
+let name d_cube_quality_4
+let type lmv
+table 'name' new /FREQUENCY 'linename' 'linefreq*1e3' /RESAMPLE 1024 512 = = FREQUENCY
+let map%cell -5.0 5.0 ! TODO: cell i.e. pixel size in arcsec
+xy_map 'name'
+!go view
+!hardcopy 'name'.cell5.hardcopy.eps /overwrite
+
+
+
+
+
+
+
+
+
+
+

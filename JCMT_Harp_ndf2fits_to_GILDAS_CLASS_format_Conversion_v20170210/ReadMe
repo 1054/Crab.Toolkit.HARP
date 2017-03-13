@@ -1,0 +1,91 @@
+Aim:
+    Convert JCMT calibrated *.sdf to GILDAS CLASS readable format *.30m
+    
+Usage:
+    cd /any/directory/ # which contains e.g. a20151130_00034_01_0001.sdf
+    /malatang/documents/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_format_Conversion/do_sdf_convert_fits -input a20151130_00034_01_0001.sdf -output NGC2903 -receptors 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+    # -input is the JCMT calibrated *.sdf. One file a time. 
+    # -output is the output basename. 
+    # -receptors is the list of receptor numbers, starting from 0 to 15. It can be omitted when processing all receptors. 
+
+Software dependency:
+    starlink
+    idl
+
+Last update:
+    2016-03-06
+    2016-07-06 auto split and then combine receptors to make a "OUTNAME_receptors_class.30m"
+    2016-07-21 auto tag
+    2016-10-28 updated this ReadMe
+
+
+Demo:
+    # 
+    # Try NGC0253 by running following commands
+    # 
+    cd /malatang/documents/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_format_Conversion/demo/
+    ./run_dzliu_NGC253_step1.sh
+    # 
+    # The "run_dzliu_NGC253_step1.sh" contains 
+    #    source name, 
+    #    processing date, 
+    #    line frequency, 
+    #    line velocity
+    #    and RA Dec information
+    # 
+    # It will call: 
+    #    "run_dzliu_ANY_step1.sh" 
+    # 
+    # to read the raw info text file: 
+    #    "/malatang/{2015raw,2016raw}/obs_info.txt", 
+    # 
+    # and extract each single observation raw data, e.g.: 
+    #    "NGC253/20160722/dataset_20151202_00030_HCN/a.sdf"
+    # 
+    # Then it will call: 
+    #    "do_sdf_convert" 
+    # 
+    # to extract each HARP receptor's subscans and save as: 
+    #    "NGC253/20160722/dataset_20151202_00030_HCN/b_receptor*_class.30m"
+    # 
+    # Then it will call CLASS script: 
+    #    "NGC253/20160722/dataset_20151202_00030_HCN/gildas-class-automerge.class"
+    # 
+    # to merge all receptors' data into a single data: 
+    #    "NGC253/20160722/dataset_20151202_00030_HCN/b_receptors_class.30m"
+    # 
+    # Then it will call CLASS script: 
+    #    "NGC253/20160722/dataset_20151202_00030_HCN/gildas-class-autotag.greg" # ---- <TODO> this is where we need to improve!
+    # 
+    # to automatically compute the quality of each subscan of each receptor and tag them and save as:
+    #    "NGC253/20160722/dataset_20151202_00030_HCN/b_receptors_class_tagged.30m"
+    # 
+    # The above commands are step1, which is dealing with each single day's observation, 
+    # below we run step2 to merge all days' observations, by running:
+    # 
+    ./run_dzliu_NGC253_step2.sh
+    # 
+    # The "run_dzliu_NGC253_step2.sh" will call
+    #    "run_dzliu_ANY_step2.sh" 
+    # 
+    # to make directory:
+    #    "NGC253/20160722/dataset_merged_HCN(4-3)/"
+    # 
+    # and call CLASS script:
+    #    "NGC253/20160722dataset_merged_HCN(4-3)/gildas-class-automerge-datasets.class"
+    # 
+    # to merge all days' observations, 
+    # set windows according to the infomation in "run_dzliu_NGC253_step2.sh" 
+    # remove baseline, 
+    # and create the multi-scan-merged baseline-subtracted data: 
+    #    "NGC253/20160722dataset_merged_HCN(4-3)/d.30m"
+    # 
+    # and run xy_map to make final data cube: 
+    #    "NGC253/20160722dataset_merged_HCN(4-3)/d_cube.lmv"
+    #    "NGC253/20160722dataset_merged_HCN(4-3)/d_cube_quality_4.lmv"    # -- this is high quality data (find /quality 4)
+    # 
+    # 
+    # 
+    # 
+    
+

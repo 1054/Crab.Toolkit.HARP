@@ -1,0 +1,287 @@
+! 
+! 
+! Usage:
+!     @gildas-class-autotag
+! 
+! Notes: 
+!     this script will read a 30m spectra cube and inspect each spectrum one by one
+!     this script will make a rough guess on the quality of each spectrum
+! 
+! 
+
+! 
+! User-define
+! <TEST>
+!LET NAME b_receptors_class
+!LET FREQUENCY (345.796/(1.0+0.005)) ! expected line observing freuency in GHz
+!LET VELOCITY 500 ! expected line velocity width in km/s
+
+! 
+! Check Variables
+! 
+IF (.NOT.EXIST(emptystr)) DEFINE CHAR*1 emptystr
+IF (NAME.EQ.emptystr) THEN
+   SAY "Error! name is not defined! Please LET NAME be the data file name without suffix 30m."
+   RETURN
+ENDIF
+IF (FREQUENCY.EQ.0) THEN
+   SAY "Error! FREQUENCY is not defined! Please LET FREQUENCY be the expected line observing frequency in GHz."
+   RETURN
+ENDIF
+IF (VELOCITY.EQ.0) THEN
+   SAY "Error! VELOCITY is not defined! Please LET VELOCITY be the expected line velocity width in km/s."
+   RETURN
+ENDIF
+
+! 
+! Auto-define
+! 
+IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename
+IF (.NOT.EXIST(linefreq)) DEFINE DOUBLE linefreq
+IF (.NOT.EXIST(linewidth)) DEFINE DOUBLE linewidth
+IF (.NOT.EXIST(autotagsmooth)) DEFINE DOUBLE autotagsmooth
+IF (.NOT.EXIST(autotagmedian)) DEFINE DOUBLE autotagmedian
+IF (.NOT.EXIST(autotagmean))   DEFINE DOUBLE autotagmean
+IF (.NOT.EXIST(autotagmin))    DEFINE DOUBLE autotagmin
+IF (.NOT.EXIST(autotagmax))    DEFINE DOUBLE autotagmax
+IF (.NOT.EXIST(autotagrms))    DEFINE DOUBLE autotagrms
+IF (.NOT.EXIST(autotagtmp))    DEFINE DOUBLE autotagtmp
+IF (.NOT.EXIST(autoFlagEdgeChanLeft))  DEFINE DOUBLE autoFlagEdgeChanLeft
+IF (.NOT.EXIST(autoFlagEdgeChanRight)) DEFINE DOUBLE autoFlagEdgeChanRight
+LET filename name
+LET linefreq FREQUENCY    ! line center in GHz
+LET linewidth 'VELOCITY/2.99792458e5*linefreq' ! line width in GHz
+LET autotagsmooth 0     ! the smooth level, higher number means more smoothing <TODO> currently disabled
+LET autotagmedian 0.10  ! the median value which corresponds to quality 4 <TODO> currently obsoleted
+LET autoFlagEdgeChanLeft 30
+LET autoFlagEdgeChanRight 30
+
+
+! 
+! FILE
+! 
+file out 'name'_tagging multiple /overwrite
+file in 'name'
+find 
+
+
+! 
+! PRES
+! 
+IF (.NOT.EXIST(autotagVALUE)) THEN
+    DEFINE DOUBLE autotagVALUE[found]
+ENDIF
+IF (.NOT.EXIST(autotagNOISE)) THEN
+    DEFINE DOUBLE autotagNOISE[found]
+ENDIF
+IF (.NOT.EXIST(autotagRSPEC)) THEN
+    DEFINE STRUCTURE autotagRSPEC
+    DEFINE INTEGER autotagRSPEC%NCHAN
+    DEFINE DOUBLE autotagRSPEC%RCHAN
+    DEFINE DOUBLE autotagRSPEC%RESTF
+    DEFINE DOUBLE autotagRSPEC%FOFF
+    DEFINE DOUBLE autotagRSPEC%FRES
+    DEFINE DOUBLE autotagRSPEC%VOFF
+    DEFINE DOUBLE autotagRSPEC%VRES
+ENDIF
+
+
+! 
+! LOOP to smooth all spectra
+! 
+FOR i 1 TO found
+    
+    get i
+    
+    ! kill bad channels at the edges
+    !!for j 1 TO 66 'R%HEAD%SPE%NCHAN-65' TO 'R%HEAD%SPE%NCHAN' 
+    !!    draw kill j
+    !!next
+    
+    let autotagRSPEC%NCHAN 'R%HEAD%SPE%NCHAN'
+    let autotagRSPEC%RCHAN 'R%HEAD%SPE%RCHAN'
+    let autotagRSPEC%FOFF 'R%HEAD%SPE%FOFF'
+    let autotagRSPEC%FRES 'R%HEAD%SPE%FRES'
+    let autotagRSPEC%RESTF 'R%HEAD%SPE%RESTF'
+    
+    write
+    
+    FOR j 1 TO autotagsmooth
+        
+        smooth box 5
+        
+        resample 'autotagRSPEC%NCHAN' 'autotagRSPEC%RCHAN' 'autotagRSPEC%RESTF' 'autotagRSPEC%FRES' FREQUENCY !Now we use RESTF instead of FOFF VOFF like things. 
+        !resample 'autotagRSPEC%NCHAN' 'autotagRSPEC%RCHAN' 'autotagRSPEC%FOFF' 'autotagRSPEC%FRES' FREQUENCY !<fixed><20160702><dzliu>; RESTFREQ -- CRVAL1
+        !MODIFY FREQUENCY 0
+        !MODIFY RECENTER 'autotagRSPEC%RCHAN'
+        !exam R%HEAD%POS% R%HEAD%SPE%
+        
+        write
+        
+    NEXT
+    
+NEXT
+
+
+! 
+! Read results and plot
+! 
+file in 'name'_tagging
+find
+
+
+! 
+! Prepare write rms record file
+! 
+SIC OUTPUT 'name'_tagging.rms.txt NEW
+
+! 
+! Read each spectrum and compute noise by setting a line window
+! 
+FOR i 1 TO found
+    
+    set unit F ! Frequency
+    set plot H ! Histogram
+    
+    !set mode x 352400 353600
+    !set mode y -3 3
+    
+    !get i 2; pl; hardcopy hdcp_'i'_sm2.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm2.eps"
+    !get i 3; pl; hardcopy hdcp_'i'_sm3.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm3.eps"
+    !get i 4; pl; hardcopy hdcp_'i'_sm4.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm4.eps"
+    !get i 5; pl; hardcopy hdcp_'i'_sm5.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm5.eps"
+    !get i 6; pl; hardcopy hdcp_'i'_sm6.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm6.eps"
+    
+    get i; pl
+    !<Note> set window only accepts velocity, and needs to set unit V then set unit F back
+    !say window '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth*1e3/2.0-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    !set window '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth*1e3/2.0-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    set unit V
+    say window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    set window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    set unit F
+    draw window
+    base /continuum /pl ! /continuum 
+    let autotagVALUE[i] = R%HEAD%BAS%SIGFI
+    let autotagNOISE[i] = R%HEAD%BAS%SIGFI
+    
+    get i; pl
+    base last /pl
+    draw window
+    draw text 15 3 "rms="'autotagVALUE[i]'
+    
+    say "rms" 'autotagVALUE[i]' "window" 'R%HEAD%BAS%W1[1]' 'R%HEAD%BAS%W1[2]'
+    
+    ! Plot intermediate screens
+    IF ((((i*1.0/int(found/10))-int(i*1.0/int(found/10))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
+        hardcopy checkplot_'name'_tagging_'i'.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps"
+    ENDIF
+    
+NEXT
+
+SIC OUTPUT
+
+! 
+! Compute the statistics of autotagNOISE
+! 
+COMPUTE autotagrms    RMS    autotagNOISE
+COMPUTE autotagmean   MEAN   autotagNOISE
+COMPUTE autotagmedian MEDIAN autotagNOISE
+COMPUTE autotagmin    MIN    autotagNOISE
+COMPUTE autotagmax    MAX    autotagNOISE
+SAY "autotag RMS    'autotagrms'"
+SAY "autotag MEAN   'autotagmean'"
+SAY "autotag MEDIAN 'autotagmedian'"
+SAY "autotag MIN    'autotagmin'"
+SAY "autotag MAX    'autotagmax'"
+
+
+
+! 
+! Prepare output tagged file
+! 
+SIC COPY 'name'.30m 'name'_tagged.30m
+file update 'name'_tagged
+find 
+
+
+! 
+! Write output tagged file
+! 
+FOR i 1 TO found
+    
+    get i
+    
+    ! kill bad channels at the edges
+    !!for j 1 TO 66 'R%HEAD%SPE%NCHAN-65' TO 'R%HEAD%SPE%NCHAN' 
+    !!    draw kill j
+    !!next
+    
+    ! tag the quality
+    !!IF ((int(autotagVALUE[i]/autotagmedian*4.0)).LT.8) THEN
+    !!    tag 'int(autotagVALUE[i]/autotagmedian*4.0)'
+    !!ELSE
+    !!    tag 8
+    !!ENDIF
+    
+    ! 
+    ! tag the quality <20160701> by rms noise distribution
+    ! 
+    IF      (autotagNOISE[i].LT.(autotagmean-3*autotagrms)) THEN
+        tag 1
+    ELSE IF (autotagNOISE[i].LT.(autotagmean-2*autotagrms)) THEN
+        tag 1
+    ELSE IF (autotagNOISE[i].LT.(autotagmean-1*autotagrms)) THEN
+        tag 2
+    ELSE IF (autotagNOISE[i].LT.(autotagmean+0*autotagrms)) THEN
+        tag 3
+    ELSE IF (autotagNOISE[i].LT.(autotagmean+1*autotagrms)) THEN
+        tag 4
+    ELSE IF (autotagNOISE[i].LT.(autotagmean+2*autotagrms)) THEN
+        tag 5
+    ELSE IF (autotagNOISE[i].LT.(autotagmean+3*autotagrms)) THEN
+        tag 6
+    ELSE IF (autotagNOISE[i].LT.(autotagmean+4*autotagrms)) THEN
+        tag 7
+    ELSE
+        tag 8
+    ENDIF
+    
+    update
+    
+    set mode y auto
+    set mode x auto
+    
+NEXT
+
+
+! 
+! Write output averaged file
+! 
+file in 'name'_tagged
+file out 'name'_tagged_averaged_quality_6 single /overwrite
+find /quality 6
+!consistency
+!average
+
+
+
+!file in 'name'_tagged
+!file out 'name'_tagged_averaged_quality_4 single /overwrite
+!find /quality 4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

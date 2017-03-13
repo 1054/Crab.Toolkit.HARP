@@ -1,0 +1,68 @@
+#!/bin/bash
+# 
+
+source $HOME/Softwares/GILDAS/SETUP.bash
+
+mkdir "Merge" 2>/dev/null
+cd "Merge"
+
+List_of_Spec=($(ls -1d ../../Level_1_Process/Scan_*/b_receptor1_class.30m))
+
+# Prepare output file: "Merged.30m"
+# And prepare script: "do_gildas_class_spec_merge.class"
+mv "do_gildas_class_spec_merge.class" "do_gildas_class_spec_merge.class.backup" 2>/dev/null
+mv "Merged.30m" "Merged.30m.backup" 2>/dev/null
+echo "! " >  "do_gildas_class_spec_merge.class"
+echo "! Output to Merged.30m" >> "do_gildas_class_spec_merge.class"
+echo "file out Merged single /overwrite" >> "do_gildas_class_spec_merge.class"
+
+# Loop
+for (( i=0; i<${#List_of_Spec[@]}; i++ )); do
+    Name_of_Spec=$(basename "${List_of_Spec[i]}" | sed -e 's/\.30m$//g')
+    echo "${i}"
+    ln -fs "${List_of_Spec[i]}" "Scan_${i}.30m"
+    echo "! "                       >> "do_gildas_class_spec_merge.class"
+    echo "! Input Scan_${i}"        >> "do_gildas_class_spec_merge.class"
+    echo "file in Scan_${i}"        >> "do_gildas_class_spec_merge.class"
+    echo "find"                     >> "do_gildas_class_spec_merge.class"
+    echo "FOR i 1 TO found"         >> "do_gildas_class_spec_merge.class"
+    echo "  get i"                  >> "do_gildas_class_spec_merge.class"
+    echo "  write"                  >> "do_gildas_class_spec_merge.class"
+    echo "NEXT"                     >> "do_gildas_class_spec_merge.class"
+    #if [[ $i -ge 2 ]]; then break; fi
+done
+
+#cat "do_gildas_class_spec_merge.class"
+echo "class @do_gildas_class_spec_merge.class"
+echo "@do_gildas_class_spec_merge.class" | class
+
+# Prepare plot script
+cp "/Users/dzliu/Work/SpireLines/Works/MALATANG_JCMT_to_GILDAS/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_format_Conversion_v20170210/gildas-class-autoclick.greg" \
+    .
+cp "/Users/dzliu/Work/SpireLines/Works/MALATANG_JCMT_to_GILDAS/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_format_Conversion_v20170210/gildas-class-autotag.greg" \
+    .
+
+echo "! "                           >> "do_gildas_class_spec_plot.class"
+echo "! Plot spectra in Merged.30m" >> "do_gildas_class_spec_plot.class"
+echo "let name Merged"              >> "do_gildas_class_spec_plot.class"
+echo "@gildas-class-autoclick"      >> "do_gildas_class_spec_plot.class"
+echo ""                             >> "do_gildas_class_spec_plot.class"
+
+echo "! "                                                                               >> "do_gildas_class_spec_autotag.class"
+echo "! Autotag spectra in Merged.30m"                                                  >> "do_gildas_class_spec_autotag.class"
+echo "LET NAME b_receptors_class"                                                       >> "do_gildas_class_spec_autotag.class"
+echo "LET FREQUENCY (345.796/(1.0+0.005)) ! expected line observing freuency in GHz"    >> "do_gildas_class_spec_autotag.class"
+echo "LET VELOCITY 400 ! expected line velocity width in km/s"                          >> "do_gildas_class_spec_autotag.class"
+echo "@gildas-class-autotag"                                                            >> "do_gildas_class_spec_autotag.class"
+echo ""                                                                                 >> "do_gildas_class_spec_autotag.class"
+
+#cat "do_gildas_class_spec_plot.class"
+echo ""
+echo "Please run "
+echo "class @do_gildas_class_spec_plot.class"
+echo "class @do_gildas_class_spec_autotag.class"
+echo ""
+
+cd ..
+
+

@@ -1,0 +1,12 @@
+This is version 20161028. 
+
+This code is used to plot each subscan in each day's observation data, for example: 
+    cd "demo/NGC253/20160722/dataset_20160715_00062_HCO+/"
+    class
+    let name b_receptors_class_tagged
+    @gildas-class-autoclick
+
+
+* Based on Zhiyu's CLASS codes :)
+
+

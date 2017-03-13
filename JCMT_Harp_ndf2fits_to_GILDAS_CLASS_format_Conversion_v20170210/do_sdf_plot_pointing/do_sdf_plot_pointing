@@ -1,0 +1,94 @@
+#!/bin/bash
+# 
+# Aim:
+#    Read the JCMT HARP Receptors' RA Dec from *_class.fits file
+#    and launch ds9 to plot the pointings
+# 
+# Input:
+#    fits format photometry image 
+#    fits format single receptor data *_class.fits
+# 
+# Usage:
+#    /home/dzliu/Work/20160325-JCMT-HARP-HCN/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_Conversion/do_sdf_plot_pointing/do_sdf_plot_pointing -photo /malatang/NGC253/wise/N253_w3.fits
+#    
+# Last update:
+#    2016-03-05 dzliu
+#    2016-03-19 dzliu
+#    2016-07-02 dzliu
+# 
+
+
+# Software dependency
+if [[ $(type fitshdr 2>/dev/null | wc -l) -eq 0 ]]; then
+    echo "Error! fitshdr was not found! We need that to read fits header!"
+    exit 1
+fi
+
+
+# User input
+InputPhotoFits=$(echo $* | perl -p -e 's/-photo\s*(\S*)\s*/\1/g' | grep -E '^*.fits$')
+if [[ x"$InputPhotoFits" == x ]]; then
+    echo "Error! Please input -photo ABCD.fits!"
+    exit 1
+else 
+    echo "Using photo $InputPhotoFits"
+fi
+
+
+# Read _wcs.txt and create ds9 region file
+InputCoordList=($(ls -v *_receptor*_wcs.txt))
+InputClassFits=($(ls -v *_receptor*_class.fits))
+OutputScriptFile="receptors.ds9.bash"
+OutputRegionFile="receptors.ds9.reg"
+
+if [[ ${#InputCoordList[@]} -eq 0 ]]; then 
+    echo "Error! Could not find any *_receptor*_wcs.txt!"
+fi
+if [[ ${#InputClassFits[@]} -eq 0 ]]; then 
+    echo "Error! Could not find any *_receptor*_class.fits!"
+fi
+
+printf "fk5\n" > "$OutputRegionFile"
+printf "point(%0.7f,%0.7f) # point=cross 30 width=4 color=green\n" \
+    $(fitshdr ${InputClassFits[0]} | grep "^CRVAL2 *=" | tr -s ' ' | cut -d ' ' -f 3) \
+    $(fitshdr ${InputClassFits[0]} | grep "^CRVAL3 *=" | tr -s ' ' | cut -d ' ' -f 3) >> "$OutputRegionFile"
+
+for (( i=0; i<${#InputCoordList[@]}; i++ )); do
+    InputReceptorRA=($(cat ${InputCoordList[$i]} | tr -s ' ' | sed -e 's/^ *//g' | cut -d ' ' -f 2))
+    InputReceptorDec=($(cat ${InputCoordList[$i]} | tr -s ' ' | sed -e 's/^ *//g' | cut -d ' ' -f 3))
+    InputReceptorLabel=($(cat ${InputCoordList[$i]} | tr -s ' ' | sed -e 's/^ *//g' | cut -d ' ' -f 4))
+    for (( j=0; j<${#InputReceptorRA[@]}; j++ )); do
+        #echo $InputReceptorRA
+        #echo $InputReceptorDec
+        OutputReceptorColor="yellow"
+        if [[ ${InputReceptorLabel[$j]} == H15 ]]; then OutputReceptorColor="#0000FF" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H14 ]]; then OutputReceptorColor="#8A2BE2" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H13 ]]; then OutputReceptorColor="#A52A2A" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H12 ]]; then OutputReceptorColor="#DEB887" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H11 ]]; then OutputReceptorColor="#FFD700" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H10 ]]; then OutputReceptorColor="#7FFF00" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H09 ]]; then OutputReceptorColor="#D2691E" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H08 ]]; then OutputReceptorColor="#FF7F50" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H07 ]]; then OutputReceptorColor="#6495ED" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H06 ]]; then OutputReceptorColor="#FFF8DC" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H05 ]]; then OutputReceptorColor="#DC143C" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H04 ]]; then OutputReceptorColor="#00FFFF" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H03 ]]; then OutputReceptorColor="#008B8B" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H02 ]]; then OutputReceptorColor="#006400" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H01 ]]; then OutputReceptorColor="#8B008B" ; fi
+        if [[ ${InputReceptorLabel[$j]} == H00 ]]; then OutputReceptorColor="#FF1493" ; fi
+        OutputReceptorRadius=8.0
+        #printf "circle(%0.7f,%0.7f,%0.3f\") # color=$OutputReceptorColor " ${InputReceptorRA[$j]} ${InputReceptorDec[$j]} 15.0; echo "#" "${InputPhotoFits[$i]}"
+        printf "circle(%0.7f,%0.7f,%0.3f\") # color=\"$OutputReceptorColor\" text={${InputCoordList[$i]}}\n" ${InputReceptorRA[$j]} ${InputReceptorDec[$j]} ${OutputReceptorRadius} >> "$OutputRegionFile"
+    done
+    #cat "receptors.ds9.reg"
+done
+
+echo "ds9 $InputPhotoFits -regions showtext no -region load receptors.ds9.reg &" > "$OutputScriptFile"
+echo "ds9 $InputPhotoFits -regions showtext no -region load receptors.ds9.reg &" 
+      ds9 $InputPhotoFits -regions showtext no -region load receptors.ds9.reg &
+
+
+
+
+

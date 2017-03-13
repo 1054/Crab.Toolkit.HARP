@@ -1,0 +1,36 @@
+This is version 20161028. 
+
+This code is used to autotag each subscan in each day's observation data, for example: 
+    "demo/NGC253/20160722/dataset_20151202_00030_HCN/b_receptors_class.30m"
+    "demo/NGC253/20160722/dataset_20160715_00062_HCO+/b_receptors_class.30m"
+
+The output data are for example: 
+    "demo/NGC253/20160722/dataset_20151202_00030_HCN/b_receptors_class_tagged.30m"
+    "demo/NGC253/20160722/dataset_20160715_00062_HCO+/b_receptors_class_tagged.30m"
+
+Currently we are still using a very simple way to compute the qualities:
+    first set window to mask edge channels, 
+    then compute RMS for each subscan spectrum, 
+    then compute the mean and rms of the RMS of all subscans in a day's observation (named autotagmean and autotagrms), 
+    then determine qualities:
+        1 : each spectrum's RMS < (autotagmean-2*autotagrms)
+        2 : each spectrum's RMS < (autotagmean-1*autotagrms)
+        3 : each spectrum's RMS < (autotagmean+0*autotagrms)
+        4 : each spectrum's RMS < (autotagmean+1*autotagrms)
+        5 : each spectrum's RMS < (autotagmean+2*autotagrms)
+        6 : each spectrum's RMS < (autotagmean+3*autotagrms)
+        7 : each spectrum's RMS < (autotagmean+4*autotagrms)
+        8 : all worse spectra. 
+
+Current drawback: 
+    This code is not considering Tsys of each day's observation. 
+    For example, if the overall RMS in one day 1 is higher than in another day 2, 
+    this code will rank the qualities individually for day 1 and day 2, 
+    and day 1's high quality spectra are actually only median quality in day 2. 
+    When finally merging all days, this will cause some problem. 
+
+
+Notes:
+    * Based on Zhiyu's CLASS codes :)
+
+

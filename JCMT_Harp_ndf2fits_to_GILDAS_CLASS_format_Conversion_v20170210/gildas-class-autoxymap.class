@@ -1,0 +1,45 @@
+! 
+! @gildas-class-autoxymap
+! 
+! auto table and xy_map the 30m data cube
+! 
+! 
+
+! 
+! User-defined
+! 
+LET NAME b_receptors_class_tagged
+LET LINE CO(3-2)
+LET FREQUENCY 345.796
+
+! 
+! Auto-define
+! 
+IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename
+LET filename 'NAME'
+IF (.NOT.EXIST(linename)) DEFINE CHAR*12 linename
+LET linename 'LINE'
+IF (.NOT.EXIST(linefreq)) DEFINE double linefreq
+LET linefreq 'FREQUENCY'
+
+! 
+! Convert 30m data to TABLE format data, 
+! Then call xy_map to grid,
+! Then call go view to view
+! 
+IF (FILE("'filename'.30m")) THEN
+    SAY "Reading "'filename'".30m"
+    FILE IN 'filename'.30m
+    FIND
+    LET NAME 'filename'_gridded
+    LET TYPE lmv
+    TABLE 'NAME' NEW /FREQUENCY 'linename' 'linefreq*1e3'
+    XY_MAP 'NAME'
+    GO VIEW
+    HARDCOPY 'NAME'.hardcopy.eps /OVERWRITE
+ELSE
+    SAY "Error! Could not find "'filename'".30m!"
+ENDIF
+
+
+

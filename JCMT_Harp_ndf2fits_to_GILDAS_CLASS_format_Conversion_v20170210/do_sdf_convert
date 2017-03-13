@@ -1,0 +1,421 @@
+#!/bin/bash
+# 
+# Aim:
+#    convert JCMT HARP *.sdf to GILDAS CLASS *.fits and *.30m
+# 
+# Dependency:
+#    starlink (JCMT)
+#    class (GILDAS)
+#    idl 
+#    
+# Last update:
+#    2016-03-04 dzliu
+#    2016-03-05 dzliu RA Dec done
+#    2016-11-01 dzliu, zyzhang -- Tsys done
+# 
+
+# 
+# Prepare readlink 
+# 
+# readlink
+if [[ $(uname) == *"Darwin"* ]]; then
+    function readlink() {
+        if [[ $# -gt 1 ]]; then if [[ "$1" == "-f" ]]; then shift; fi; fi
+        DIR=$(echo "${1%/*}"); (cd "$DIR" && echo "$(pwd -P)/$(basename ${1})")
+    }
+fi
+
+# 
+# Check starlink
+# 
+if [[ "$KAPPA_DIR"x == ""x || "$SMURF_DIR"x == ""x || "$CONVERT_DIR"x == ""x ]]; then
+    echo "Error! Starlink was not installed?!"
+    echo "System variable \$KAPPA_DIR \$SMURF_DIR \$CONVERT_DIR invalid!"
+    exit 1
+fi
+if [[ "$IDL_DIR"x == ""x ]]; then
+    echo "Error! IDL was not installed?!"
+    echo "System variable \$IDL_DIR invalid!"
+    exit 1
+fi
+
+# 
+# Check argument and print usage
+# 
+DOSDFCONVERTSCRIPTFILE=$(readlink -f $0)
+DOSDFCONVERTSCRIPTDIR=$(dirname $DOSDFCONVERTSCRIPTFILE)
+if [[ $# -eq 0 ]]; then
+    echo "Usage: "
+    echo "  $DOSDFCONVERTSCRIPTFILE -input a20151130_00034_01_0001 -output NGC2903 [-receptors 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]"
+    echo ""
+    exit
+fi
+
+# 
+# Read arguments
+# 
+inputname=""
+outnumb=()
+outname=""
+linename=""
+linefreq="" # the expected line observing frequency in GHz
+linewidth="350" # the expected line velocity width in km/s, default is 350 km/s <TODO> does not support multiple lines yet <TODO>
+doclean=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+ "-inputname") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        inputname="$1"
+                   else break; fi; shift
+               done;;
+     "-input") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        inputname="$1"
+                   else break; fi; shift
+               done;;
+        "-in") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        inputname="$1"
+                   else break; fi; shift
+               done;;
+"-outputname") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        outname="$1"
+                   else break; fi; shift
+               done;;
+    "-output") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        outname="$1"
+                   else break; fi; shift
+               done;;
+       "-out") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        outname="$1"
+                   else break; fi; shift
+               done;;
+  "-linefreq") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        linefreq="$1"
+                   else break; fi; shift
+               done;;
+"-linefrequency") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        linefreq="$1"
+                   else break; fi; shift
+               done;;
+ "-linewidth") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        linewidth="$1"
+                   else break; fi; shift
+               done;;
+    "-linename") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        linename="$1"
+                   else break; fi; shift
+               done;;
+  "-receptor") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        outnumb=(${outnumb[@]} $1)
+                   else break; fi; shift
+               done;;
+ "-receptors") shift
+               while [[ $# -gt 0 ]]; do
+                   if [[ "$1" != "-"* ]]; then
+                        outnumb=(${outnumb[@]} $1)
+                   else break; fi; shift
+               done;;
+            *) shift
+    esac
+done
+
+# 
+# Check arguments
+# 
+if [[ "$inputname"x == ""x ]]; then
+    echo "Error! -input is invalid!"
+    exit 1
+fi
+if [[ "$inputname" == *".sdf" ]]; then
+    inputname="$(echo $inputname | sed -e 's%.sdf$%%g')"
+fi
+if [[ "$outname"x == ""x ]]; then
+    outname="${inputname}_out"
+fi
+if [[ ${#outnumb[@]} -lt 1 ]]; then
+    echo "Warning! -receptor is not given! Using 0-15!"
+    outnumb=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+fi
+if [[ "$linefreq"x == ""x ]]; then
+    echo "Error! -linefreq is invalid!"
+    exit 1
+fi
+
+# 
+# Prepare starlink
+# 
+. $KAPPA_DIR/kappa.sh > /dev/null
+. $SMURF_DIR/smurf.sh > /dev/null
+. $CONVERT_DIR/convert.sh > /dev/null
+
+
+# 
+# Prepare IDL
+# 
+if [[ x"$IDL_PATH" == x ]]; then
+    export IDL_PATH="+$(dirname $(readlink -f $0)):+$IDL_DIR/lib"
+else
+    export IDL_PATH="+$(dirname $(readlink -f $0)):+$IDL_PATH"
+fi
+
+
+
+
+
+# 
+# Finally, start to deal with data
+# 
+
+
+# 
+# copy input sdf to temporary sdf and set sideband and wcs attributes
+# 
+echo ""
+echo "cp \"${inputname}.sdf\" \"${outname}_temp.sdf\""
+      cp  "${inputname}.sdf"   "${outname}_temp.sdf"
+
+rm "${outname}_temp.sdf.header.txt" 2>/dev/null
+echo "fitslist \"${outname}_temp.sdf\" \"${outname}_temp.sdf.header.txt\""
+      fitslist  "${outname}_temp.sdf"   "${outname}_temp.sdf.header.txt"
+
+outsideband=$(grep "^OBS_SB" "${outname}_temp.sdf.header.txt" | perl -p -e "s/.*=\s*'(.*)'\s*\/.*/\1/g") # OBS_SB
+#wcsattrib "${outname}_temp.sdf" set sideband USB # (LSB) #<DONE><BUG><20160701># Should choose the right SB
+wcsattrib "${outname}_temp.sdf" set sideband "$outsideband"
+wcsattrib "${outname}_temp.sdf" set system freq
+#ndftrace "${outname}_temp.sdf"
+
+# 
+# make receptors' wcs and label catalog
+# 
+rm "${outname}_receptors.fits" "${outname}_receptors.sdf" 2>/dev/null
+echo "makecube in=\"${outname}_temp\" outcat=\"${outname}_receptors.fits\" out=\"${outname}_receptors.sdf\" > \"${outname}_receptors.makecube.log\""
+echo "makecube in=\"${outname}_temp\" outcat=\"${outname}_receptors.fits\" out=\"${outname}_receptors.sdf\"" > "${outname}_receptors.makecube.sh"
+      makecube in="${outname}_temp"   outcat="${outname}_receptors.fits"   out="${outname}_receptors.sdf"    > "${outname}_receptors.makecube.log" # extract receptors' ra dec -- <20161101><dzliu> seems useless
+if [[ $doclean -eq 1 ]]; then 
+    rm "${outname}_receptors.sdf" "${outname}_receptors.makecube.sh" 2>/dev/null
+fi
+
+# 
+# make receptors' wcs and label catalog
+# <20161101><dzliu><zyzhang>
+# 
+gettsys      "${outname}_temp" > "${outname}_receptors_TSYS.txt"
+gettsys -trx "${outname}_temp" > "${outname}_receptors_TRX.txt"
+# gettsys -statistics 
+# hdstrace a20070420_00014_01_0001.more.acsis.acsis.trx nlines=all
+temp_list_labels=($(head -n 1 "${outname}_receptors_TSYS.txt"))
+temp_list_tsyses=($(head -n 2 "${outname}_receptors_TSYS.txt" | tail -n 1 | sed -e 's/*/-99/g')) #<20170211># some Tsys is shown as *
+for (( temp_list_i=0; temp_list_i<${#temp_list_labels[@]}; temp_list_i++ )); do
+    echo "${temp_list_tsyses[$temp_list_i]}" > "${outname}_receptor${temp_list_labels[$temp_list_i]}_TSYS.txt"
+done
+
+# 
+# <20160722> for RxA3-ACSIS data, set -receptors to 1
+# 
+if grep -i -q "INSTRUME=.*RxA.*" "${outname}_temp.sdf.header.txt"; then
+    outnumb=(1)
+fi
+if grep -i -q "INSTRUME=.*RXB.*" "${outname}_temp.sdf.header.txt"; then
+    outnumb=(1)
+fi
+
+# 
+# <20170211> doclean
+# 
+if [[ $doclean -eq 1 ]]; then
+    rm "${outname}_temp.sdf.header.txt"
+fi
+
+# 
+# loop input receptors
+# 
+for (( i=0; i<${#outnumb[@]}; i++ )); do
+    
+    echo "ndfcopy \"${outname}_temp(,${outnumb[$i]},)\" \"${outname}_receptor${outnumb[$i]}.sdf\" exten"
+          ndfcopy  "${outname}_temp(,${outnumb[$i]},)"   "${outname}_receptor${outnumb[$i]}.sdf"  exten
+    
+    #makecube in="${outname}_receptor${outnumb[$i]}.sdf" outcat="${outname}_receptor${outnumb[$i]}_wcs.fits" out="${outname}_receptor${outnumb[$i]}_wcs.sdf" # extract receptor's ra dec #<20160319># outcat is limited to 39 char
+    rm "${outname}_receptor${outnumb[$i]}_wcs.fits" "${outname}_receptor${outnumb[$i]}_wcs.sdf" 2>/dev/null
+    echo "makecube in=\"${outname}_receptor${outnumb[$i]}.sdf\" outcat=\"${outname}_receptor${outnumb[$i]}_wcs.fits\" out=\"${outname}_receptor${outnumb[$i]}_wcs.sdf\" > \"${outname}_receptor${outnumb[$i]}_wcs.makecube.log\""
+    echo "makecube in=\"${outname}_receptor${outnumb[$i]}.sdf\" outcat=\"${outname}_receptor${outnumb[$i]}_wcs.fits\" out=\"${outname}_receptor${outnumb[$i]}_wcs.sdf\"" > "${outname}_receptor${outnumb[$i]}_wcs.makecube.sh"
+          makecube in="${outname}_receptor${outnumb[$i]}.sdf"   outcat="${outname}_receptor${outnumb[$i]}_wcs.fits"   out="${outname}_receptor${outnumb[$i]}_wcs.sdf"    > "${outname}_receptor${outnumb[$i]}_wcs.makecube.log" # extract receptor's ra dec
+    if [[ $doclean -eq 1 ]]; then 
+        rm "${outname}_receptor${outnumb[$i]}.sdf" "${outname}_receptor${outnumb[$i]}_wcs.sdf" "${outname}_receptor${outnumb[$i]}_wcs.makecube.sh" "${outname}_receptor${outnumb[$i]}_wcs.makecube.log" 2>/dev/null
+    fi
+    
+    if [[ ! -f "${outname}_receptor${outnumb[$i]}_wcs.fits" ]]; then 
+        #echo ""
+        #echo "********************************************************************************************************************************"
+        #echo "Warning! Failed to run \"makecube in=${outname}_receptor${outnumb[$i]}.sdf outcat=${outname}_receptor${outnumb[$i]}_wcs.fits\""
+        #echo "********************************************************************************************************************************"
+        #echo ""
+        continue
+    fi
+    
+    echo "ndfcopy \"${outname}_temp(,${outnumb[$i]},)\" \"${outname}_receptor${outnumb[$i]}.sdf\" exten trim trimwcs"
+          ndfcopy  "${outname}_temp(,${outnumb[$i]},)"   "${outname}_receptor${outnumb[$i]}.sdf"  exten trim trimwcs # copy full freq, one receptor, all subscans
+    #ndftrace "${outname}_receptor${outnumb[$i]}.sdf"
+    
+    if [[ ! -f "${outname}_receptor${outnumb[$i]}.sdf" ]]; then 
+        echo ""
+        echo "********************************************************************************************************************************"
+        echo "Warning! Failed to run \"ndfcopy ${outname}_temp(,${outnumb[$i]},) ${outname}_receptor${outnumb[$i]}.sdf exten trim trimwcs\""
+        echo "********************************************************************************************************************************"
+        echo ""
+        continue
+    fi
+    
+    #setaxis '34.sdf' 4  expr exprs="CENTRE+(INDEX-1)"
+    #wcsframe '34.sdf' sky
+    
+    if [[ -f "${outname}_receptor${outnumb[$i]}.fits" ]]; then
+        mv "${outname}_receptor${outnumb[$i]}.fits" "backup.${outname}_receptor${outnumb[$i]}.fits" 2>/dev/null
+        #echo ""; echo "Backupped ${outname}_receptor${outnumb[$i]}.fits as backup.${outname}_receptor${outnumb[$i]}.fits"; echo ""
+    fi
+    echo "ndf2fits \"${outname}_receptor${outnumb[$i]}.sdf\" \"${outname}_receptor${outnumb[$i]}.fits\" allowtab comp=d encoding=\"fits-wcs\""
+          ndf2fits  "${outname}_receptor${outnumb[$i]}.sdf"   "${outname}_receptor${outnumb[$i]}.fits"  allowtab comp=d encoding="fits-wcs"
+    
+    
+    if [[ -f "${outname}_receptor${outnumb[$i]}_class.fits" ]]; then
+        mv "${outname}_receptor${outnumb[$i]}_class.fits" "backup.${outname}_receptor${outnumb[$i]}_class.fits" 2>/dev/null
+        #echo ""; echo "Backupped ${outname}_receptor${outnumb[$i]}_class.fits as backup.${outname}_receptor${outnumb[$i]}_class.fits"; echo ""
+    fi
+    echo ""
+    echo "idl -quiet -e \"do_sdf_convert_fits\" -args \"${outname}_receptor${outnumb[$i]}\""
+          idl -quiet -e  "do_sdf_convert_fits"  -args  "${outname}_receptor${outnumb[$i]}"
+    
+    if [[ ! -f "${outname}_receptor${outnumb[$i]}_class.fits" ]]; then
+        echo ""
+        echo "Error! Failed to run idl do_sdf_convert_fits!"
+        sleep 999
+        exit 1
+    fi
+    
+    if [[ x"$linename" != x ]]; then
+        if type sethead 2>&1 | grep -q -v "not found"; then
+            sethead "${outname}_receptor${outnumb[$i]}_class.fits" LINE="$linename"
+        fi
+    fi
+    
+    
+    if [[ -f "${outname}_receptor${outnumb[$i]}_class.30m" ]]; then
+        mv "${outname}_receptor${outnumb[$i]}_class.30m" "backup.${outname}_receptor${outnumb[$i]}_class.30m" 2>/dev/null
+        echo ""; echo "Backupped ${outname}_receptor${outnumb[$i]}_class.30m as backup.${outname}_receptor${outnumb[$i]}_class.30m"; echo ""
+    fi
+    echo "file out \"${outname}_receptor${outnumb[$i]}_class.30m\" multiple /overwrite" > "${outname}_receptor${outnumb[$i]}_class.src"
+    echo "fits read \"${outname}_receptor${outnumb[$i]}_class.fits\" /mode index"      >> "${outname}_receptor${outnumb[$i]}_class.src"
+    #echo "write"                                                                       >> "${outname}_receptor${outnumb[$i]}_class.src"
+    #echo "fits both \"${outname}_receptor${outnumb[$i]}_class.30m\""                   >> "${outname}_receptor${outnumb[$i]}_class.src"
+    #echo "set observatory JCMT -155:28:46.4 +19:49:33.8 4120"                          >> "${outname}_receptor${outnumb[$i]}_class.src"
+    #echo "for i 1 to found; modify doppler *; next"                                    >> "${outname}_receptor${outnumb[$i]}_class.src"
+    echo "exit"                                                                        >> "${outname}_receptor${outnumb[$i]}_class.src"
+    echo class                                                                        "<" "${outname}_receptor${outnumb[$i]}_class.src" ">" "${outname}_receptor${outnumb[$i]}_class.src.log"
+         class                                                                         <  "${outname}_receptor${outnumb[$i]}_class.src"  >  "${outname}_receptor${outnumb[$i]}_class.src.log"
+    #echo "@${outname}_receptor${outnumb[$i]}_class.src" | class                       >  "${outname}_receptor${outnumb[$i]}_class.src.log"
+    
+    echo "file in \"${outname}_receptor${outnumb[$i]}_class\""                  > "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo "find /line HCN*"                                                     >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo "list /toc"                                                           >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo "get first"                                                           >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo "header"                                                              >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo "plot"                                                                >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo "hardcopy \"${outname}_receptor${outnumb[$i]}_class.eps\" /overwrite" >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo ""                                                                    >> "${outname}_receptor${outnumb[$i]}_class.plt"
+    echo class                                                                "<" "${outname}_receptor${outnumb[$i]}_class.plt" ">" "${outname}_receptor${outnumb[$i]}_class.plt.log"
+         class                                                                 <  "${outname}_receptor${outnumb[$i]}_class.plt"  >  "${outname}_receptor${outnumb[$i]}_class.plt.log"
+    echo "" 
+    echo "Written to CLASS data ${outname}_receptor${outnumb[$i]}_class.30m"
+    echo "Created by CLASS script @${outname}_receptor${outnumb[$i]}_class.src"
+    echo "Plotted by CLASS script @${outname}_receptor${outnumb[$i]}_class.plt"
+    
+    
+done
+
+
+# Also write to GILDAS CLASS do_dzliu_merge.class
+if [[ -f "$DOSDFCONVERTSCRIPTDIR/gildas-class-automerge.class" && x"outname" != x ]]; then
+    cat "$DOSDFCONVERTSCRIPTDIR/gildas-class-automerge.class" | \
+         sed -e "s/^[!]*LET NAME .*/LET NAME ${outname}/g"  > "gildas-class-automerge.class"
+    echo "Updated CLASS script @gildas-class-automerge.class!"
+    echo "Running CLASS script @gildas-class-automerge.class!"
+    echo "@gildas-class-automerge" | class > "log-gildas-class-automerge"
+    echo "Done!"
+fi
+
+
+# Also write to GILDAS CLASS gildas-class-autotag.greg
+if [[ -f "$DOSDFCONVERTSCRIPTDIR/gildas-class-autotag.greg" && x"outname" != x ]]; then
+    cat "$DOSDFCONVERTSCRIPTDIR/gildas-class-autotag.greg" | \
+         sed -e "s/^[!]*LET NAME .*/LET NAME ${outname}_receptors_class/g" | 
+         sed -e "s/^[!]*LET FREQUENCY .*/LET FREQUENCY ${linefreq} ! expected line observing freuency in GHz/g" | 
+         sed -e "s/^[!]*LET VELOCITY .*/LET VELOCITY ${linewidth} ! expected line velocity width in km\/s/g" > "gildas-class-autotag.greg"
+    echo "Updated CLASS script @gildas-class-autotag.greg!"
+    echo "Running CLASS script @gildas-class-autotag.greg!"
+    echo "@gildas-class-autotag" | class > "log-gildas-class-autotag"
+    echo "Done!"
+fi
+
+
+# Also write to GILDAS CLASS gildas-class-autoxymap.class
+if [[ -f "$DOSDFCONVERTSCRIPTDIR/gildas-class-autoxymap.class" && x"outname" != x ]]; then
+    cat "$DOSDFCONVERTSCRIPTDIR/gildas-class-autoxymap.class" | \
+        sed -e "s/^[!]*LET NAME .*/LET NAME ${outname}_receptors_class_tagged/g" > "gildas-class-autoxymap.class"
+    if [[ x"${linename}" != x ]]; then
+        sed -i -e "s/^[!]*LET LINE .*/LET LINE ${linename} ! expected line name/g" "gildas-class-autoxymap.class"
+    fi
+    if [[ x"${linefreq}" != x ]]; then
+        sed -i -e "s/^[!]*LET FREQUENCY .*/LET FREQUENCY ${linefreq} ! expected line observing freuency in GHz/g" "gildas-class-autoxymap.class"
+    fi
+    echo "Updated CLASS script @gildas-class-autoxymap.class!"
+    echo "Running CLASS script @gildas-class-autoxymap.class!"
+    echo "@gildas-class-autoxymap" | class > "log-gildas-class-autoxymap"
+    echo "Done!"
+fi
+
+
+### Also write to GILDAS CLASS do_dzliu_combine.class
+##if [[ -f "do_dzliu_combine.class" && x"outname" != x ]]; then
+##    sed -i -e "s/^LET name .*/LET name $outname/g" "do_dzliu_combine.class"
+##    echo "Updated CLASS script @do_dzliu_combine.class!"
+##fi
+
+
+### Also write to GILDAS CLASS do_dzliu_tag.class
+##if [[ -f "do_dzliu_tag.class" && x"outname" != x ]]; then
+##    sed -i -e "s/^LET name .*/LET name ${outname}_combined/g" "do_dzliu_tag.class"
+##    echo "Updated CLASS script @do_dzliu_tag.class!"
+##fi
+
+
+# Also write to GILDAS CLASS do_dzliu_average.class
+##if [[ -f "do_dzliu_average.class" && x"outname" != x ]]; then
+##    sed -i -e "s/^LET name .*/LET name ${outname}_combined_tagged/g" "do_dzliu_average.class"
+##    echo "Updated CLASS script @do_dzliu_average.class!"
+##fi
+
+echo ""
+
+
+
+
+

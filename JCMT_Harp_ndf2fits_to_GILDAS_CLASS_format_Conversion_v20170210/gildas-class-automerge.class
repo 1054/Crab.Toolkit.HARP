@@ -1,0 +1,39 @@
+! 
+! @gildas-class-automerge
+! 
+! simply merge all 30m data files
+! 
+! 
+
+! 
+! User-defined
+! 
+LET NAME b
+
+! 
+! Auto-define
+! 
+IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename
+LET filename 'NAME'
+
+! 
+! Merge 30m data, 
+! Input file names must be 'filename'"_receptor'i'_class.30m"
+! Output file name will be 'filename'"_receptors_class.30m"
+! 
+FILE OUT 'filename'_receptors_class.30m SINGLE /OVERWRITE
+FOR i 0 TO 15
+    SAY "Checking "'filename'"_receptor"'i'"_class.30m"
+    IF (FILE("'filename'_receptor'i'_class.30m")) THEN
+        SAY "Reading "'filename'"_receptor"'i'"_class.30m"
+        FILE IN 'filename'_receptor'i'_class.30m
+        FIND
+        FOR j 1 TO FOUND
+            GET j
+            WRITE
+        NEXT
+    ENDIF
+NEXT
+
+
+
