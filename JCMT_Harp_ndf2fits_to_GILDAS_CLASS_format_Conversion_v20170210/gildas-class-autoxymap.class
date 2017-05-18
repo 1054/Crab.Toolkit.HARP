@@ -28,17 +28,29 @@ LET linefreq 'FREQUENCY'
 ! Then call go view to view
 ! 
 IF (FILE("'filename'.30m")) THEN
+    
     SAY "Reading "'filename'".30m"
     FILE IN 'filename'.30m
-    FIND
+    FIND /LINE 'linename'
     LET NAME 'filename'_gridded
     LET TYPE lmv
     TABLE 'NAME' NEW /FREQUENCY 'linename' 'linefreq*1e3'
     XY_MAP 'NAME'
     GO VIEW
     HARDCOPY 'NAME'.hardcopy.eps /OVERWRITE
+    
+    
+    FILE IN 'filename'.30m
+    FIND /LINE 'linename'
+    LET NAME 'filename'_gridded
+    LET TYPE lmv
+    TABLE 'NAME' NEW /FREQUENCY 'linename' 'linefreq*1e3'
+    XY_MAP 'NAME' /TYPE VLM
+    
 ELSE
+    
     SAY "Error! Could not find "'filename'".30m!"
+    
 ENDIF
 
 

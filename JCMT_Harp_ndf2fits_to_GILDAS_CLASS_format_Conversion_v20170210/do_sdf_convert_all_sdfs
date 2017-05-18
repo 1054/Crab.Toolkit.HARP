@@ -1,0 +1,323 @@
+#!/bin/bash
+# 
+# Here we call do_sdf_convert for all sdf files under current directory
+# each sdf will be converted under each subdirectory
+# 
+
+
+# 
+# Check environment
+# 
+if [[ x"$STARLINK_DIR" == x ]]; then 
+    echo "Error! Starlink environment variable \"\$STARLINK_DIR\" is not set? Please make sure Starlink is installed!"
+    exit 1
+fi
+#if [[ x"$GAG_EXEC_DIR" == x ]]; then 
+#    echo "Error! Gildas environment variable \"\$GAG_EXEC_DIR\" is not set? Please make sure Gildas is installed!"
+#    exit 1
+#fi
+if [[ $(type class 2>/dev/null | wc -l) -eq 0 ]]; then 
+    echo "Error! Gildas command \"class\" is not found? Please make sure Gildas is installed!"
+    exit 1
+fi
+
+
+# 
+# Source Starlink
+# 
+#export STARLINK_DIR="/Users/dzliu/Softwares/STARLINK/star-2016A"
+if [[ x"$KAPPA_DIR" == x || x"$SMURF_DIR" == x || x"$CONVERT_DIR" == x ]]; then
+    source "$STARLINK_DIR/etc/profile"
+fi
+#export PATH="$STARLINK_DIR/bin:$PATH"
+#export KAPPA_DIR="$STARLINK_DIR/bin/kappa"
+#export SMURF_DIR="$STARLINK_DIR/bin/smurf"
+#export CONVERT_DIR="$STARLINK_DIR/bin/convert"
+
+
+# 
+# Source gildas
+# 
+#source "$HOME/Softwares/GILDAS/SETUP.bash"
+
+
+# 
+# Check do_sdf_convert
+# 
+export DO_SDF_CONVERT="$(dirname ${BASH_SOURCE[0]})/do_sdf_convert"
+# 
+if [[ ! -f "$DO_SDF_CONVERT" ]]; then
+    echo "Error! \"$DO_SDF_CONVERT\" was not found! Please make sure this code is completely downloaded!"
+    exit 1
+fi
+
+
+# 
+# Usage
+# 
+usage() {
+    echo "Usage: "
+    echo "  do_sdf_convert_all_sdfs *.sdf -obsfreq 345.458 -linewidth 300   # obsfreq in GHz, linewidth in km/s."
+}
+
+
+# 
+# Readlink
+# 
+if [[ $(uname) == *"Darwin"* ]]; then
+    function readlink() {
+        if [[ $# -gt 1 ]]; then if [[ "$1" == "-f" ]]; then shift; fi; fi
+        DIR="$1"; if [[ "$DIR" != *"/"* ]]; then DIR="./$DIR"; fi # 20170228: fixed bug: path without "/"
+        DIR=$(echo "${DIR%/*}") # 20160410: fixed bug: source SETUP just under the Softwares dir
+        if [[ -d "$DIR" ]]; then cd "$DIR" && echo "$(pwd -P)/$(basename ${1})"; 
+        else echo "$(pwd -P)/$(basename ${1})"; fi
+    }
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 
+# Read input arguments
+# 
+List_of_Sdf=()
+Line_Redshift=""
+Line_RestFreq=""
+Line_ObsvFreq=""
+Line_VelWidth=""
+Line_LineName=""
+Output_Dir=""
+Current_Dir=$(pwd -P)
+
+while [[ $# -gt 0 ]]; do
+    TempStr=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+    echo "$TempStr"
+    case "$TempStr" in
+        "-REDSHIFT" ) if [[ $# -gt 1 ]]; then shift; Line_Redshift="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+               "-Z" ) if [[ $# -gt 1 ]]; then shift; Line_Redshift="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+       "-LINEWIDTH" ) if [[ $# -gt 1 ]]; then shift; Line_VelWidth="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+              "-DV" ) if [[ $# -gt 1 ]]; then shift; Line_VelWidth="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+        "-RESTFREQ" ) if [[ $# -gt 1 ]]; then shift; Line_RestFreq="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+         "-OBSFREQ" ) if [[ $# -gt 1 ]]; then shift; Line_ObsvFreq="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+        "-LINENAME" ) if [[ $# -gt 1 ]]; then shift; Line_LineName="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+            "-LINE" ) if [[ $# -gt 1 ]]; then shift; Line_LineName="$1"; else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+          "-OUTPUT" ) if [[ $# -gt 1 ]]; then shift; Output_Dir="$1";    else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+             "-OUT" ) if [[ $# -gt 1 ]]; then shift; Output_Dir="$1";    else echo "Error! Input $1 must be followed with 1 argument!"; exit 1; fi; shift;;
+            *".SDF" ) if [[ "$1" != *"*"* ]]; then List_of_Sdf+=("$1"); else List_of_Sdf+=($(ls "$1")); fi; shift;;
+                  * ) shift
+    esac
+done
+
+
+# 
+# Compute LineWidth
+# 
+if [[ -z "$Line_VelWidth" ]]; then
+    Line_VelWidth="400"
+fi
+
+
+# 
+# Compute ObsvFreq
+# 
+if [[ -z "$Line_ObsvFreq" ]]; then
+    echo "Computing obs. freq."
+    if [[ -z "$Line_RestFreq" && ! -z "$Line_LineName" ]]; then
+        TempStr=$(echo "$Line_LineName" | tr '[:lower:]' '[:upper:]')
+        case "$TempStr" in
+            "CO(1-0)"   ) Line_RestFreq="115.2712018";;
+            "CO(2-1)"   ) Line_RestFreq="230.5380000";;
+            "CO(3-2)"   ) Line_RestFreq="345.7959899";;
+            "CO(4-3)"   ) Line_RestFreq="461.0407682";;
+            "CO(5-4)"   ) Line_RestFreq="576.2679305";;
+            "CO(6-5)"   ) Line_RestFreq="691.4730763";;
+            "CO(7-6)"   ) Line_RestFreq="806.6518060";;
+            "CO(8-7)"   ) Line_RestFreq="921.7997000";;
+            "CO(9-8)"   ) Line_RestFreq="1036.9123930";;
+            "CO(10-9)"  ) Line_RestFreq="1151.9854520";;
+            "CO(11-10)" ) Line_RestFreq="1267.0144860";;
+            "CO(12-11)" ) Line_RestFreq="1381.9951050";;
+            "CO(13-12)" ) Line_RestFreq="1496.9229090";;
+            "CO(14-13)" ) Line_RestFreq="1611.7935180";;
+            "CO(15-14)" ) Line_RestFreq="1726.6025057";;
+            "HCN(1-0)"  ) Line_RestFreq="88.6316023";;
+            "HCN(2-1)"  ) Line_RestFreq="177.2611115";;
+            "HCN(3-2)"  ) Line_RestFreq="265.8864343";;
+            "HCN(4-3)"  ) Line_RestFreq="354.5054779";;
+            "HCN(5-4)"  ) Line_RestFreq="443.1161493";;
+            "HCN(6-5)"  ) Line_RestFreq="531.7163479";;
+            "HCN(7-6)"  ) Line_RestFreq="620.3040022";;
+            "HCN(8-7)"  ) Line_RestFreq="708.8770051";;
+            "HCN(9-8)"  ) Line_RestFreq="797.4332623";;
+            "HCN(10-9)" ) Line_RestFreq="885.9706949";;
+             *          ) Line_RestFreq=""
+        esac
+        echo "Computing rest freq. from input line name \"$Line_LineName\": $Line_RestFreq GHz"
+    fi
+    if [[ ! -z "$Line_RestFreq" && ! -z "$Line_Redshift" ]]; then
+        Line_ObsvFreq=$(awk "BEGIN {print $Line_RestFreq/(1.0+$Line_Redshift)}")
+        echo "Computing obs. freq. from input redshift $Line_Redshift: $Line_ObsvFreq GHz"
+    fi
+fi
+
+if [[ -z "$Line_ObsvFreq" ]]; then
+    echo "Error! Please give the obsfreq!"
+    usage
+    exit
+fi
+
+if [[ ${#List_of_Sdf[@]} -eq 0 ]]; then
+    echo "Error! Please give *.sdf files!"
+    usage
+    exit
+fi
+
+
+
+
+
+
+
+# 
+# Format Output_Dir
+# 
+if [[ x"$Output_Dir" == x ]]; then
+    echo "Output to current directory"
+    #echo "Output to \"$Output_Dir\""
+else
+    if [[ "$Output_Dir" != *"/" ]]; then
+        Output_Dir="$Output_Dir/"
+    fi
+    echo "Output to \"$Output_Dir\""
+fi
+
+
+
+
+
+
+# 
+# Loop each *.sdf
+# 
+for (( i=0; i<${#List_of_Sdf[@]}; i++ )); do
+    Name_of_Sdf=$(basename "${List_of_Sdf[i]}" | sed -e 's/\.sdf$//g')
+    Path_of_Sdf=$(readlink -f "${List_of_Sdf[i]}")
+    # 
+    if [[ ! -d "${Output_Dir}Scan_${Name_of_Sdf}" ]]; then
+        echo ""
+        echo ""
+        echo "############################################################"
+        echo "${Output_Dir}Scan_${Name_of_Sdf}"
+        echo "############################################################"
+        mkdir -p "${Output_Dir}Scan_${Name_of_Sdf}" 2>/dev/null
+        cd "${Output_Dir}Scan_${Name_of_Sdf}"
+        ln -fs "${Path_of_Sdf}" "a.sdf"
+        if [[ ! -z "$Line_LineName" ]]; then
+            "$DO_SDF_CONVERT" -input "a.sdf" -out "b" -linefreq "$Line_ObsvFreq" -linewidth "$Line_VelWidth" -linename "$Line_LineName"
+        else
+            "$DO_SDF_CONVERT" -input "a.sdf" -out "b" -linefreq "$Line_ObsvFreq" -linewidth "$Line_VelWidth"
+        fi
+        cd "${Current_Dir}"
+    fi
+    #if [[ $i -ge 2 ]]; then break; fi
+done
+
+
+
+
+
+
+# 
+# Prepare script to merge all scans
+# 
+mkdir "${Output_Dir}Scan_merged" 2>/dev/null
+
+echo "cp \"$(dirname ${BASH_SOURCE[0]})/gildas-class-autoclick.greg\" \"${Output_Dir}Scan_merged/\""
+      cp  "$(dirname ${BASH_SOURCE[0]})/gildas-class-autoclick.greg"   "${Output_Dir}Scan_merged/"
+echo "cp \"$(dirname ${BASH_SOURCE[0]})/gildas-class-autotag.greg\" \"${Output_Dir}Scan_merged/\""
+      cp  "$(dirname ${BASH_SOURCE[0]})/gildas-class-autotag.greg"   "${Output_Dir}Scan_merged/"
+echo "cp \"$(dirname ${BASH_SOURCE[0]})/gildas-class-autoxymap.class\" \"${Output_Dir}Scan_merged/\""
+      cp  "$(dirname ${BASH_SOURCE[0]})/gildas-class-autoxymap.class"   "${Output_Dir}Scan_merged/"
+
+echo "! "                                >  "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
+echo "! Plot spectra in Scan_merged.30m" >> "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
+echo "let name Scan_merged"              >> "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
+echo "@gildas-class-autoclick"           >> "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
+echo ""                                  >> "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
+
+echo "! "                                                                      >  "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo "! Autotag spectra in Scan_merged.30m"                                    >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo "LET NAME Scan_merged"                                                    >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo "LET FREQUENCY $Line_ObsvFreq ! expected line observing freuency in GHz"  >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo "LET VELOCITY $Line_VelWidth ! expected line velocity width in km/s"      >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo "@gildas-class-autotag"                                                   >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo ""                                                                        >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+
+echo "! "                                        >  "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+echo "! Output to Scan_merged.30m"               >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+echo "file out Scan_merged single /overwrite"    >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+
+
+
+
+
+# 
+# Loop each *.sdf again to merge
+# 
+for (( i=0; i<${#List_of_Sdf[@]}; i++ )); do
+    Name_of_Sdf=$(basename "${List_of_Sdf[i]}" | sed -e 's/\.sdf$//g')
+    Path_of_Sdf=$(readlink -f "${List_of_Sdf[i]}")
+    echo ""
+    echo ""
+    cp "${Output_Dir}Scan_${Name_of_Sdf}/b_receptors_class.30m" "${Output_Dir}Scan_merged/Scan_${i}.30m"
+    echo "! "                       >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "! Input Scan_${i}"        >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "say \"Scan_${i}\""        >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "file in Scan_${i}"        >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "find"                     >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "FOR i 1 TO found"         >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "  get i"                  >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "  write"                  >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+    echo "NEXT"                     >> "${Output_Dir}Scan_merged/do_gildas_class_spec_merge.class"
+done
+
+cd "${Output_Dir}Scan_merged/"
+
+echo "class @do_gildas_class_spec_merge"
+echo "@do_gildas_class_spec_merge" | class > log-spec-merge
+
+cd "${Current_Dir}"
+
+
+
+
+
+
+
+# 
+# Done
+# 
+echo "Done!"
+
+
+
+
+
+
+
+
+
+
+

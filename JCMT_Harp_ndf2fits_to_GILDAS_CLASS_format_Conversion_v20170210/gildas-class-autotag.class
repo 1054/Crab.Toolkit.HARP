@@ -1,0 +1,319 @@
+! 
+! 
+! Usage:
+!     @gildas-class-autotag
+! 
+! Notes: 
+!     this script will read a 30m spectra cube and inspect each spectrum one by one
+!     this script will make a rough guess on the quality of each spectrum
+! 
+! 
+
+
+!
+! Auto-define
+! 
+IF (.NOT.EXIST(linefreq))      DEFINE DOUBLE linefreq               /GLOBAL
+IF (.NOT.EXIST(linewidth))     DEFINE DOUBLE linewidth              /GLOBAL
+
+
+! 
+! User-define
+! 
+LET NAME Scan_merged
+!LET linefreq (354.5054779/(1.0+0.000133)) ! expected line observing freuency in GHz
+!LET linewidth 300 ! expected line velocity width in km/s
+SET MODE Y -10 10
+
+
+! 
+! Auto-define
+! 
+IF (.NOT.EXIST(emptystr))      DEFINE CHAR*1 emptystr               /GLOBAL
+IF (.NOT.EXIST(filename))      DEFINE CHAR*256 filename             /GLOBAL
+IF (.NOT.EXIST(linename))      DEFINE CHAR*256 linename             /GLOBAL
+IF (.NOT.EXIST(autotagsmooth)) DEFINE DOUBLE autotagsmooth          /GLOBAL
+IF (.NOT.EXIST(autotagmedian)) DEFINE DOUBLE autotagmedian          /GLOBAL
+IF (.NOT.EXIST(autotagmean))   DEFINE DOUBLE autotagmean            /GLOBAL
+IF (.NOT.EXIST(autotagmin))    DEFINE DOUBLE autotagmin             /GLOBAL
+IF (.NOT.EXIST(autotagmax))    DEFINE DOUBLE autotagmax             /GLOBAL
+IF (.NOT.EXIST(autotagrms))    DEFINE DOUBLE autotagrms             /GLOBAL
+IF (.NOT.EXIST(autotagtmp))    DEFINE DOUBLE autotagtmp             /GLOBAL
+IF (NAME.EQ.emptystr) THEN
+   SAY "Error! name is not defined! Please LET NAME be the data file name without suffix 30m."
+   RETURN
+ENDIF
+
+LET filename NAME                                                   ! 
+LET autotagsmooth 0                                                 ! the smooth level, higher number means more smoothing <TODO> currently disabled
+LET autotagmedian 0.10                                              ! the median value which corresponds to quality 4 <TODO> currently obsoleted
+
+
+! 
+! <TODO>
+! 
+!LET linename "HCN(4-3)"
+
+
+! 
+! FILE IN 'name'
+! 
+file in 'name'
+
+
+! 
+! FIND
+! 
+IF (linename.EQ.emptystr) THEN
+    find
+ELSE
+    find /line 'linename'
+ENDIF
+
+
+! 
+! DEFINE autotagNOISE array
+! 
+IF (EXIST(autotagNOISE)) THEN
+    DELETE /VAR autotagNOISE
+ENDIF
+
+DEFINE DOUBLE autotagNOISE[found] /GLOBAL
+
+
+
+
+! 
+! FILE OUT 'name'"_tagging"
+! 
+IF ((.NOT.FILE('name'"_tagging.30m")).OR.(.NOT.FILE('name'"_tagging.rms.txt"))) THEN
+    
+    file out 'name'"_tagging" multiple /overwrite
+    
+    ! 
+    ! Prepare to write rms to 'name'"_tagging.rms.txt"
+    ! 
+    IF (.NOT.FILE('name'"_tagging.rms.txt")) THEN
+        
+        SIC OUTPUT 'name'"_tagging.rms.txt" NEW
+        
+        ! 
+        ! LOOP to smooth all spectra and resample to the same frequency axis and remove baseline
+        ! 
+        FOR i 1 TO found
+            
+            set unit F ! Frequency
+            set plot H ! Histogram
+            
+            IF (i.EQ.1) THEN
+                get first
+            ELSE
+                get next
+            ENDIF
+            
+            set viewport 0.2 0.9 0.2 0.6
+            box p o i p /unit v upper
+            plot
+            
+            !set viewport 0.2 0.9 0.4 0.8
+            !box n o i p
+            !plot
+            !set viewport 0.2 0.9 0.2 0.4
+            !box p o i n /unit v upper
+            
+            ! 
+            ! kill bad channels at the edges
+            ! 
+            !for j 1 TO 66 'R%HEAD%SPE%NCHAN-65' TO 'R%HEAD%SPE%NCHAN' 
+            !    draw kill j
+            !next
+            
+            ! 
+            ! write Version 1
+            ! 
+            write
+            
+            ! 
+            ! remove baseline and compute rms
+            !
+            MESSAGE I "rmbase" "i "'i'"/"'found'
+            @gildas-class-remove-baseline.class
+            
+            ! 
+            ! write Version 2
+            ! 
+            write
+            
+            ! 
+            ! smooth multiple times according to the 'autotagsmooth' number
+            ! 
+            FOR j 1 TO autotagsmooth
+                smooth box 5
+                resample 'R%HEAD%SPE%NCHAN' 'R%HEAD%SPE%RCHAN' 'R%HEAD%SPE%RESTF' 'R%HEAD%SPE%FRES' FREQUENCY
+                @gildas-class-remove-baseline.class
+                write
+            NEXT
+            
+            ! 
+            ! print baseline rms
+            ! 
+            say 'autotagNOISE[i]'
+            
+            ! 
+            ! Plot screenshots/checkplots (plot 20 checkplots)
+            ! 
+            IF ((((i*1.0/int(found/20))-int(i*1.0/int(found/20))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
+                hardcopy checkplot_'name'_tagging_'i'.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps"
+            ENDIF
+            
+        NEXT
+        
+        SIC OUTPUT
+        
+    ENDIF
+    
+ENDIF
+
+
+
+
+! 
+! Compute the statistics of autotagNOISE
+! 
+ACCEPT autotagNOISE /ARRAY 'name'"_tagging.rms.txt"
+
+COMPUTE autotagrms    RMS    autotagNOISE
+COMPUTE autotagmean   MEAN   autotagNOISE
+COMPUTE autotagmedian MEDIAN autotagNOISE
+COMPUTE autotagmin    MIN    autotagNOISE
+COMPUTE autotagmax    MAX    autotagNOISE
+SAY "autotag RMS    "'autotagrms'
+SAY "autotag MEAN   "'autotagmean'
+SAY "autotag MEDIAN "'autotagmedian'
+SAY "autotag MIN    "'autotagmin'
+SAY "autotag MAX    "'autotagmax'
+
+
+
+
+! 
+! Prepare the output tagged file
+! 
+IF (.NOT.FILE('name'"_tagged.30m")) THEN
+    
+    file in 'name'
+    file out 'name'"_tagged" single /overwrite
+    
+    IF (linename.EQ.emptystr) THEN
+        find
+    ELSE
+        find /line 'linename'
+    ENDIF
+    
+    
+    ! 
+    ! Write output tagged file
+    ! 
+    FOR i 1 TO found
+        
+        IF (i.EQ.1) THEN
+            get first
+        ELSE
+            get next
+        ENDIF
+        
+        ! 
+        ! tag the quality <20160701> by rms noise distribution
+        ! 
+        IF      (autotagNOISE[i].LT.(autotagmean-3*autotagrms)) THEN
+            tag 1
+        ELSE IF (autotagNOISE[i].LT.(autotagmean-2*autotagrms)) THEN
+            tag 1
+        ELSE IF (autotagNOISE[i].LT.(autotagmean-1*autotagrms)) THEN
+            tag 2
+        ELSE IF (autotagNOISE[i].LT.(autotagmean+0*autotagrms)) THEN
+            tag 3
+        ELSE IF (autotagNOISE[i].LT.(autotagmean+1*autotagrms)) THEN
+            tag 4
+        ELSE IF (autotagNOISE[i].LT.(autotagmean+2*autotagrms)) THEN
+            tag 5
+        ELSE IF (autotagNOISE[i].LT.(autotagmean+3*autotagrms)) THEN
+            tag 6
+        ELSE IF (autotagNOISE[i].LT.(autotagmean+4*autotagrms)) THEN
+            tag 7
+        ELSE
+            tag 8
+        ENDIF
+        
+        ! 
+        ! remove baseline <20170327>
+        ! 
+        MESSAGE I "rmbase" "i "'i'"/"'found'", tag "
+        @gildas-class-remove-baseline.class
+        
+        
+        write
+        
+        
+        !set mode y auto
+        !set mode x auto
+        
+    NEXT
+
+ENDIF
+
+
+
+! 
+! Write output averaged and smoothed file
+! 
+file in 'name'"_tagged"
+file out 'name'"_tagged_averaged_quality_7" single /overwrite
+
+IF (linename.EQ.emptystr) THEN
+    find /quality 7
+ELSE
+    find /quality 7 /line 'linename'
+ENDIF
+
+FOR i 1 TO found
+    
+    IF (i.EQ.1) THEN
+        get first
+    ELSE
+        get next
+    ENDIF
+    
+    ! 
+    ! EXTRACT good channels <TODO> auto-range?
+    ! 
+    EXTRACT '1+60' 'R%HEAD%SPE%NCHAN-30' C
+    
+    ! 
+    ! smooth
+    ! 
+    smooth box 20
+    
+    write
+    
+NEXT
+
+!consistency
+!average
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

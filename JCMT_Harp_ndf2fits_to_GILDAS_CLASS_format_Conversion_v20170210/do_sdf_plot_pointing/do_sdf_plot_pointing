@@ -42,10 +42,12 @@ OutputScriptFile="receptors.ds9.bash"
 OutputRegionFile="receptors.ds9.reg"
 
 if [[ ${#InputCoordList[@]} -eq 0 ]]; then 
-    echo "Error! Could not find any *_receptor*_wcs.txt!"
+    echo "Error! Could not find any *_receptor*_wcs.txt! Please run this code after \"do_sdf_convert\"!"
+    exit
 fi
 if [[ ${#InputClassFits[@]} -eq 0 ]]; then 
-    echo "Error! Could not find any *_receptor*_class.fits!"
+    echo "Error! Could not find any *_receptor*_class.fits! Please run this code after \"do_sdf_convert\"!"
+    exit
 fi
 
 printf "fk5\n" > "$OutputRegionFile"
