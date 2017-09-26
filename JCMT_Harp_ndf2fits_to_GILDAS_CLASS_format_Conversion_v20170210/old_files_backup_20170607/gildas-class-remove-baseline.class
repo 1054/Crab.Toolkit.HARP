@@ -12,20 +12,21 @@
 ! User-define
 ! 
 ! <Note> needs already FILE IN and FIND and GET i
-! <Note> needs linefreq and linewidth, both in GHz
-! 
 
 ! 
 ! Check Variables
 ! 
 IF (.NOT.EXIST(linefreq)) THEN
-    EXIT
+    DEFINE DOUBLE linefreq /GLOBAL
+    LET linefreq 0
 ENDIF
 IF (.NOT.EXIST(linewidth)) THEN
-    EXIT
+    DEFINE DOUBLE linewidth /GLOBAL
+    LET linewidth 300
 ENDIF
 IF (linewidth.LE.0) THEN
-    EXIT
+    MESSAGE I "rmbase" "Warning! The input linewidth is non-positive! Set to the default value of 300 km/s!"
+    LET linewidth 300
 ENDIF
 
 ! 
@@ -37,8 +38,8 @@ IF (.NOT.EXIST(rmbasemax))       DEFINE DOUBLE rmbasemax        /GLOBAL
 IF (.NOT.EXIST(rmbaserms))       DEFINE DOUBLE rmbaserms        /GLOBAL
 IF (.NOT.EXIST(rmbasemaskleft))  DEFINE DOUBLE rmbasemaskleft   /GLOBAL
 IF (.NOT.EXIST(rmbasemaskright)) DEFINE DOUBLE rmbasemaskright  /GLOBAL
-LET rmbasemaskleft 35                                           ! GHz
-LET rmbasemaskright 35                                          ! GHz
+LET rmbasemaskleft 30                                           ! GHz
+LET rmbasemaskright 30                                          ! GHz
 
 ! 
 ! Check Variables
@@ -67,7 +68,7 @@ ENDIF
     
     set viewport 0.2 0.9 0.2 0.6
     box ! p o i p /unit v upper
-    !plot
+    plot
     
     ! 
     ! kill bad channels at the edges
@@ -103,43 +104,25 @@ ENDIF
     ! remove baseline
     ! <Note> set window only accepts velocity, and needs to set unit V then set unit F back
     ! 
-    let rmbasewindow[1] '(-rmbasespec%NCHAN*abs(rmbasespec%FRES)/2                      )/(rmbasespec%FRES)*(rmbasespec%VRES)+rmbasespec%VOFF'
-    let rmbasewindow[2] '(-rmbasespec%NCHAN*abs(rmbasespec%FRES)/2+rmbasemaskright      )/(rmbasespec%FRES)*(rmbasespec%VRES)+rmbasespec%VOFF'
-    let rmbasewindow[3] '(+rmbasespec%NCHAN*abs(rmbasespec%FRES)/2-rmbasemaskleft       )/(rmbasespec%FRES)*(rmbasespec%VRES)+rmbasespec%VOFF'
-    let rmbasewindow[4] '(+rmbasespec%NCHAN*abs(rmbasespec%FRES)/2                      )/(rmbasespec%FRES)*(rmbasespec%VRES)+rmbasespec%VOFF'
+    set unit V
+    let rmbasewindow[1] '(-rmbasespec%NCHAN*abs(rmbasespec%FRES)/2                      )/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
+    let rmbasewindow[2] '(-rmbasespec%NCHAN*abs(rmbasespec%FRES)/2+rmbasemaskright      )/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
+    let rmbasewindow[3] '(+rmbasespec%NCHAN*abs(rmbasespec%FRES)/2-rmbasemaskleft       )/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
+    let rmbasewindow[4] '(+rmbasespec%NCHAN*abs(rmbasespec%FRES)/2                      )/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
     IF (linefreq.GT.0) THEN
-    let rmbasewindow[5] '(linefreq*1e3-linewidth*1e3/2-rmbasespec%RESTF-rmbasespec%FOFF)/(rmbasespec%FRES)*(rmbasespec%VRES)+rmbasespec%VOFF'
-    let rmbasewindow[6] '(linefreq*1e3+linewidth*1e3/2-rmbasespec%RESTF-rmbasespec%FOFF)/(rmbasespec%FRES)*(rmbasespec%VRES)+rmbasespec%VOFF'
+    let rmbasewindow[5] '(linefreq*1e3-linewidth/2.99792458e5*linefreq*1e3/2-rmbasespec%RESTF-rmbasespec%FOFF)/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
+    let rmbasewindow[6] '(linefreq*1e3+linewidth/2.99792458e5*linefreq*1e3/2-rmbasespec%RESTF-rmbasespec%FOFF)/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
     ELSE
     let rmbasewindow[5] '(rmbasespec%RESTF-linewidth/2.99792458e5*rmbasespec%RESTF/2-rmbasespec%RESTF-rmbasespec%FOFF)/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
     let rmbasewindow[6] '(rmbasespec%RESTF+linewidth/2.99792458e5*rmbasespec%RESTF/2-rmbasespec%RESTF-rmbasespec%FOFF)/abs(rmbasespec%FRES)*abs(rmbasespec%VRES)+rmbasespec%VOFF'
     ENDIF
-    
-    ! 
-    ! identify if line out range
-    ! 
-    IF (((rmbasewindow[5]*rmbasespec%VRES).GT.(rmbasewindow[1]*rmbasespec%VRES)).OR.((rmbasewindow[6]*rmbasespec%VRES).LT.(rmbasewindow[4]*rmbasespec%VRES))) THEN
-        MODIFY LINENAME INVALID
-    ELSE 
-        IF (EXIST(linename)) THEN
-            MODIFY LINENAME 'linename'
-        ENDIF
-    ENDIF
-    MESSAGE I "rmbase" linename 'LINE'
-    
-    ! 
-    ! plot spec
-    ! 
-    plot
-    
     MESSAGE I "rmbase" window 'rmbasewindow[1]' 'rmbasewindow[2]' 'rmbasewindow[3]' 'rmbasewindow[4]' 'rmbasewindow[5]' 'rmbasewindow[6]'
-    set unit V
     set window 'rmbasewindow[1]' 'rmbasewindow[2]' 'rmbasewindow[3]' 'rmbasewindow[4]' 'rmbasewindow[5]' 'rmbasewindow[6]'
     set unit F
     pen /colour BLUE /weight 5
     draw window
     pen /colour RED /weight 5
-    base 0 /pl ! /continuum
+    base /pl ! /continuum
     pen /default
     
     
@@ -148,24 +131,16 @@ ENDIF
         LET autotagNOISE[i] = R%HEAD%BAS%SIGFI
     ENDIF
     
-    ! 
-    ! re-plot
-    ! 
-    !swap
-    !plot
-    !base last /pl
-    !pen /colour BLUE /weight 5
-    !draw window
-    
-    ! 
-    ! plot rms as text
-    ! 
+    !get i; pl
+    swap
+    plot
+    base last /pl
+    pen /colour BLUE /weight 5
+    draw window
     pen /colour RED /weight 3
     draw text 12.5 5.5 "\gs="'rmbaserms'" K"
     pen /default
     MESSAGE I "rmbase" "rms "'rmbaserms'", window "'nint(rmbasewindow[1]*10)/10'" "'nint(rmbasewindow[2]*10)/10'" | "'nint(rmbasewindow[3]*10)/10'" "'nint(rmbasewindow[4]*10)/10'" | "'nint(rmbasewindow[5]*10)/10'" "'nint(rmbasewindow[6]*10)/10' ! " | "'R%HEAD%BAS%W1[1]'" "'R%HEAD%BAS%W1[2]'
-    
-    MESSAGE I "rmbase" linename 'LINE'
     
 
 

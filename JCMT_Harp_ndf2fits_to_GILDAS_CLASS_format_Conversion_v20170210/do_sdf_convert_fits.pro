@@ -197,7 +197,7 @@ PRO do_sdf_convert_fits, InputFitsFile
     ; Extract Tsys from "SourceName_receptorHXX_TSYS.txt"
     ; <added><20161101><dzliu><zyzhang>
     ; 
-    IF sxpar(header,'MEDTSYS') NE '' AND sxpar(header,'MEDTSYS') NE '/' THEN BEGIN
+    IF strtrim(string(sxpar(header,'MEDTSYS')),2) NE '' AND strtrim(string(sxpar(header,'MEDTSYS')),2) NE '/' THEN BEGIN
         receptor_Tsys = DOUBLE(sxpar(header,'MEDTSYS'))
     ENDIF ELSE BEGIN
         receptor_Tsys = -99

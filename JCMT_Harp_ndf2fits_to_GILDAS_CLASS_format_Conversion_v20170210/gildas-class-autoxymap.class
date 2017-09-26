@@ -8,9 +8,9 @@
 ! 
 ! User-defined
 ! 
-LET NAME b_receptors_class_tagged
+LET NAME Scan_merged_tagged
 LET LINE CO(3-2)
-LET FREQUENCY 345.796
+LET FREQUENCY 345.5157766
 
 ! 
 ! Auto-define
@@ -23,15 +23,34 @@ IF (.NOT.EXIST(linefreq)) DEFINE double linefreq
 LET linefreq 'FREQUENCY'
 
 ! 
+! Shift
+! 
+IF (.NOT.FILE("'filename'_shifted.30m")) THEN
+    FILE IN 'filename'.30m
+    FILE OUT 'filename'_shifted.30m single /overwrite
+    FIND
+    FOR i 1 TO FOUND 
+        get 'i'
+        !modify linename 'linename'
+        modify position 00:47:33.122 -25:17:17.630
+        modify frequency 'linefreq*1e3'
+        !extract -320 320 velocity
+        !smooth box 2
+        write
+    NEXT
+ENDIF
+
+
+! 
 ! Convert 30m data to TABLE format data, 
 ! Then call xy_map to grid,
 ! Then call go view to view
 ! 
-IF (FILE("'filename'.30m")) THEN
+IF (FILE("'filename'_shifted.30m")) THEN
     
-    SAY "Reading "'filename'".30m"
-    FILE IN 'filename'.30m
-    FIND /LINE 'linename'
+    SAY "Reading "'filename'"_shifted.30m"
+    FILE IN 'filename'_shifted.30m
+    FIND /LINE 'linename' /QUALITY 5
     LET NAME 'filename'_gridded
     LET TYPE lmv
     TABLE 'NAME' NEW /FREQUENCY 'linename' 'linefreq*1e3'
@@ -40,16 +59,18 @@ IF (FILE("'filename'.30m")) THEN
     HARDCOPY 'NAME'.hardcopy.eps /OVERWRITE
     
     
-    FILE IN 'filename'.30m
-    FIND /LINE 'linename'
-    LET NAME 'filename'_gridded
-    LET TYPE lmv
-    TABLE 'NAME' NEW /FREQUENCY 'linename' 'linefreq*1e3'
-    XY_MAP 'NAME' /TYPE VLM
+    !FILE IN 'filename'_shifted.30m
+    !FIND /LINE 'linename'
+    !LET NAME 'filename'_gridded
+    !LET TYPE lmv
+    !TABLE 'NAME' NEW /FREQUENCY 'linename' 'linefreq*1e3'
+    !XY_MAP 'NAME' /TYPE VLM
+    
+    VECTOR\FITS 'filename'_gridded.lmv.fits FROM 'filename'_gridded.lmv /OVERWRITE
     
 ELSE
     
-    SAY "Error! Could not find "'filename'".30m!"
+    SAY "Error! Could not find "'filename'"_shifted.30m!"
     
 ENDIF
 

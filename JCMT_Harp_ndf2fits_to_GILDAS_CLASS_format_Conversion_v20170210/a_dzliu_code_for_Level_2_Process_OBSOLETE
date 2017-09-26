@@ -3,10 +3,10 @@
 
 source $HOME/Softwares/GILDAS/SETUP.bash
 
-mkdir "Merge" 2>/dev/null
-cd "Merge"
+mkdir "Merged" 2>/dev/null
+cd "Merged"
 
-List_of_Spec=($(ls -1d ../../Level_1_Process/Scan_*/b_receptor1_class.30m))
+List_of_Spec=($(ls -1d ../Scan_*/b_receptor1_class.30m))
 
 # Prepare output file: "Merged.30m"
 # And prepare script: "do_gildas_class_spec_merge.class"
@@ -37,9 +37,9 @@ echo "class @do_gildas_class_spec_merge.class"
 echo "@do_gildas_class_spec_merge.class" | class
 
 # Prepare plot script
-cp "/Users/dzliu/Work/SpireLines/Works/MALATANG_JCMT_to_GILDAS/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_format_Conversion_v20170210/gildas-class-autoclick.greg" \
+cp "$(dirname ${BASH_SOURCE[0]})/gildas-class-autoclick.greg" \
     .
-cp "/Users/dzliu/Work/SpireLines/Works/MALATANG_JCMT_to_GILDAS/JCMT_Harp_ndf2fits_to_GILDAS_CLASS_format_Conversion_v20170210/gildas-class-autotag.greg" \
+cp "$(dirname ${BASH_SOURCE[0]})/gildas-class-autotag.greg" \
     .
 
 echo "! "                           >> "do_gildas_class_spec_plot.class"

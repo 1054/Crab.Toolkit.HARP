@@ -11,10 +11,10 @@
 
 ! 
 ! User-define
-! <TEST>
-!LET NAME b_receptors_class
+! 
+!LET NAME Scan_merged
 !LET FREQUENCY (345.796/(1.0+0.005)) ! expected line observing freuency in GHz
-!LET VELOCITY 500 ! expected line velocity width in km/s
+!LET VELOCITY 300 ! expected line velocity width in km/s
 
 ! 
 ! Check Variables
@@ -36,9 +36,9 @@ ENDIF
 ! 
 ! Auto-define
 ! 
-IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename
-IF (.NOT.EXIST(linefreq)) DEFINE DOUBLE linefreq
-IF (.NOT.EXIST(linewidth)) DEFINE DOUBLE linewidth
+IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename /GLOBAL
+IF (.NOT.EXIST(linefreq)) DEFINE DOUBLE linefreq /GLOBAL
+IF (.NOT.EXIST(linewidth)) DEFINE DOUBLE linewidth /GLOBAL
 IF (.NOT.EXIST(autotagsmooth)) DEFINE DOUBLE autotagsmooth
 IF (.NOT.EXIST(autotagmedian)) DEFINE DOUBLE autotagmedian
 IF (.NOT.EXIST(autotagmean))   DEFINE DOUBLE autotagmean
@@ -53,12 +53,12 @@ LET linefreq FREQUENCY    ! line center in GHz
 LET linewidth 'VELOCITY/2.99792458e5*linefreq' ! line width in GHz
 LET autotagsmooth 0     ! the smooth level, higher number means more smoothing <TODO> currently disabled
 LET autotagmedian 0.10  ! the median value which corresponds to quality 4 <TODO> currently obsoleted
-LET autoFlagEdgeChanLeft 30
-LET autoFlagEdgeChanRight 30
+LET autoFlagEdgeChanLeft 35 ! GHz
+LET autoFlagEdgeChanRight 35 ! GHz
 
 
 ! 
-! FILE
+! FILE IN 'name' FILE OUT 'name'_tagging
 ! 
 file out 'name'_tagging multiple /overwrite
 file in 'name'
@@ -66,7 +66,7 @@ find
 
 
 ! 
-! PRES
+! Check Variables
 ! 
 IF (.NOT.EXIST(autotagVALUE)) THEN
     DEFINE DOUBLE autotagVALUE[found]
@@ -84,56 +84,67 @@ IF (.NOT.EXIST(autotagRSPEC)) THEN
     DEFINE DOUBLE autotagRSPEC%VOFF
     DEFINE DOUBLE autotagRSPEC%VRES
 ENDIF
+IF (.NOT.EXIST(autotagWINDOW)) THEN
+    DEFINE DOUBLE autotagWINDOW[6] ! define the velocity range window outside of which the baseline are computed
+ENDIF
 
 
 ! 
-! LOOP to smooth all spectra
+! Prepare to write rms to 'name'_tagging.rms.txt
+! 
+SIC OUTPUT 'name'_tagging.rms.txt NEW
+
+
+! 
+! LOOP to smooth all spectra and resample to the same frequency axis and remove baseline
 ! 
 FOR i 1 TO found
     
-    get i
+    set unit F ! Frequency
+    set plot H ! Histogram
     
+    get i; pl
+    
+    ! 
     ! kill bad channels at the edges
-    !!for j 1 TO 66 'R%HEAD%SPE%NCHAN-65' TO 'R%HEAD%SPE%NCHAN' 
-    !!    draw kill j
-    !!next
+    ! 
+    !for j 1 TO 66 'R%HEAD%SPE%NCHAN-65' TO 'R%HEAD%SPE%NCHAN' 
+    !    draw kill j
+    !next
     
-    let autotagRSPEC%NCHAN 'R%HEAD%SPE%NCHAN'
-    let autotagRSPEC%RCHAN 'R%HEAD%SPE%RCHAN'
-    let autotagRSPEC%FOFF 'R%HEAD%SPE%FOFF'
-    let autotagRSPEC%FRES 'R%HEAD%SPE%FRES'
-    let autotagRSPEC%RESTF 'R%HEAD%SPE%RESTF'
-    
+    ! 
+    ! write Version 1
+    ! 
     write
     
+    ! 
+    ! remove baseline and compute rms
+    ! 
+    @gildas-class-remove-baseline
+    
+    ! 
+    ! write Version 2
+    ! 
+    write
+    
+    ! 
+    ! smooth multiple times according to the 'autotagsmooth' number
+    ! 
     FOR j 1 TO autotagsmooth
-        
         smooth box 5
-        
-        resample 'autotagRSPEC%NCHAN' 'autotagRSPEC%RCHAN' 'autotagRSPEC%RESTF' 'autotagRSPEC%FRES' FREQUENCY !Now we use RESTF instead of FOFF VOFF like things. 
-        !resample 'autotagRSPEC%NCHAN' 'autotagRSPEC%RCHAN' 'autotagRSPEC%FOFF' 'autotagRSPEC%FRES' FREQUENCY !<fixed><20160702><dzliu>; RESTFREQ -- CRVAL1
-        !MODIFY FREQUENCY 0
-        !MODIFY RECENTER 'autotagRSPEC%RCHAN'
-        !exam R%HEAD%POS% R%HEAD%SPE%
-        
+        resample 'autotagRSPEC%NCHAN' 'autotagRSPEC%RCHAN' 'autotagRSPEC%RESTF' 'autotagRSPEC%FRES' FREQUENCY
+        @gildas-class-remove-baseline
         write
-        
     NEXT
     
+    ! 
+    ! Plot screenshots/checkplots (plot 20 checkplots)
+    ! 
+    IF ((((i*1.0/int(found/20))-int(i*1.0/int(found/20))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
+        hardcopy checkplot_'name'_tagging_'i'.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps"
+    ENDIF
+    
 NEXT
-
-
-! 
-! Read results and plot
-! 
-file in 'name'_tagging
-find
-
-
-! 
-! Prepare write rms record file
-! 
-SIC OUTPUT 'name'_tagging.rms.txt NEW
 
 ! 
 ! Read each spectrum and compute noise by setting a line window
@@ -153,12 +164,38 @@ FOR i 1 TO found
     !get i 6; pl; hardcopy hdcp_'i'_sm6.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm6.eps"
     
     get i; pl
+    
+    let autotagRSPEC%NCHAN 'R%HEAD%SPE%NCHAN'
+    let autotagRSPEC%RCHAN 'R%HEAD%SPE%RCHAN'
+    let autotagRSPEC%FRES  'R%HEAD%SPE%FRES'
+    let autotagRSPEC%VRES  'R%HEAD%SPE%VRES'
+    let autotagRSPEC%RESTF 'R%HEAD%SPE%RESTF'
+    !<fixed><20170327><dzliu>; let autotagRSPEC%FOFF 'R%HEAD%SPE%FOFF'
+    IF (EXIST(R%HEAD%SPE%FOFF)) THEN
+        let autotagRSPEC%FOFF 'R%HEAD%SPE%FOFF'
+    ELSE
+        let autotagRSPEC%FOFF 0.0
+    ENDIF
+    IF (EXIST(R%HEAD%SPE%VOFF)) THEN
+        let autotagRSPEC%VOFF 'R%HEAD%SPE%VOFF'
+    ELSE
+        let autotagRSPEC%VOFF 0.0
+    ENDIF
+    
     !<Note> set window only accepts velocity, and needs to set unit V then set unit F back
-    !say window '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth*1e3/2.0-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
-    !set window '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth*1e3/2.0-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
     set unit V
-    say window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
-    set window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    !<modified><20170327><dzliu>; say window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    !<modified><20170327><dzliu>; set window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
+    let autotagWINDOW[1] '(-autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2                      )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
+    let autotagWINDOW[2] '(-autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2+autoFlagEdgeChanRight)/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
+    let autotagWINDOW[3] '(+autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2-autoFlagEdgeChanLeft )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
+    let autotagWINDOW[4] '(+autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2                      )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
+    let autotagWINDOW[5] '(linefreq*1e3-linewidth/2*1e3-autotagRSPEC%RESTF-autotagRSPEC%FOFF )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
+    let autotagWINDOW[6] '(linefreq*1e3+linewidth/2*1e3-autotagRSPEC%RESTF-autotagRSPEC%FOFF )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
+    say window 'autotagWINDOW[1]' 'autotagWINDOW[2]' 'autotagWINDOW[3]' 'autotagWINDOW[4]' 'autotagWINDOW[5]' 'autotagWINDOW[6]'
+    set window 'autotagWINDOW[1]' 'autotagWINDOW[2]' 'autotagWINDOW[3]' 'autotagWINDOW[4]' 'autotagWINDOW[5]' 'autotagWINDOW[6]'
+    
+    !<Note> plot with frequency axis
     set unit F
     draw window
     base /continuum /pl ! /continuum 
@@ -168,12 +205,14 @@ FOR i 1 TO found
     get i; pl
     base last /pl
     draw window
-    draw text 15 3 "rms="'autotagVALUE[i]'
+    draw text 15 3 "rms="'autotagNOISE[i]'
     
-    say "rms" 'autotagVALUE[i]' "window" 'R%HEAD%BAS%W1[1]' 'R%HEAD%BAS%W1[2]'
+    say "rms" 'autotagNOISE[i]' "window" 'R%HEAD%BAS%W1[1]' 'R%HEAD%BAS%W1[2]'
     
-    ! Plot intermediate screens
-    IF ((((i*1.0/int(found/10))-int(i*1.0/int(found/10))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
+    write
+    
+    ! Plot intermediate screens (plot 20 checkplots)
+    IF ((((i*1.0/int(found/20))-int(i*1.0/int(found/20))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
         hardcopy checkplot_'name'_tagging_'i'.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps"
     ENDIF
     

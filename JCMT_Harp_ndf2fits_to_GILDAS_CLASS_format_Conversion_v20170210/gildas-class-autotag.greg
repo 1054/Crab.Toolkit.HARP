@@ -12,9 +12,10 @@
 ! 
 ! User-define
 ! 
-LET NAME Scan_merged
-LET FREQUENCY (345.796/(1.0+0.005)) ! expected line observing freuency in GHz
-LET VELOCITY 300 ! expected line velocity width in km/s
+!LET NAME Scan_merged
+!LET LINE CO(3-2)
+!LET FREQUENCY (345.796/(1.0+0.005)) ! expected line observing freuency in GHz
+!LET VELOCITY 300 ! expected line velocity width in km/s
 
 ! 
 ! Check Variables
@@ -36,9 +37,10 @@ ENDIF
 ! 
 ! Auto-define
 ! 
-IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename
-IF (.NOT.EXIST(linefreq)) DEFINE DOUBLE linefreq
-IF (.NOT.EXIST(linewidth)) DEFINE DOUBLE linewidth
+IF (.NOT.EXIST(filename)) DEFINE CHAR*256 filename /GLOBAL
+IF (.NOT.EXIST(linename)) DEFINE CHAR*256 linename /GLOBAL
+IF (.NOT.EXIST(linefreq)) DEFINE DOUBLE linefreq /GLOBAL
+IF (.NOT.EXIST(linewidth)) DEFINE DOUBLE linewidth /GLOBAL
 IF (.NOT.EXIST(autotagsmooth)) DEFINE DOUBLE autotagsmooth
 IF (.NOT.EXIST(autotagmedian)) DEFINE DOUBLE autotagmedian
 IF (.NOT.EXIST(autotagmean))   DEFINE DOUBLE autotagmean
@@ -48,7 +50,8 @@ IF (.NOT.EXIST(autotagrms))    DEFINE DOUBLE autotagrms
 IF (.NOT.EXIST(autotagtmp))    DEFINE DOUBLE autotagtmp
 IF (.NOT.EXIST(autoFlagEdgeChanLeft))  DEFINE DOUBLE autoFlagEdgeChanLeft
 IF (.NOT.EXIST(autoFlagEdgeChanRight)) DEFINE DOUBLE autoFlagEdgeChanRight
-LET filename name
+LET filename 'NAME'
+LET linename 'LINE'
 LET linefreq FREQUENCY    ! line center in GHz
 LET linewidth 'VELOCITY/2.99792458e5*linefreq' ! line width in GHz
 LET autotagsmooth 0     ! the smooth level, higher number means more smoothing <TODO> currently disabled
@@ -94,6 +97,8 @@ ENDIF
 ! 
 SIC OUTPUT 'name'_tagging.rms.txt NEW
 
+SIC\SYSTEM "bash -c 'if [[ ! -d check_spectra ]]; then mkdir check_spectra; fi'"
+
 
 ! 
 ! LOOP to smooth all spectra and resample to the same frequency axis and remove baseline
@@ -103,7 +108,7 @@ FOR i 1 TO found
     set unit F ! Frequency
     set plot H ! Histogram
     
-    get i; pl
+    get i ! pl
     
     ! 
     ! kill bad channels at the edges
@@ -113,18 +118,14 @@ FOR i 1 TO found
     !next
     
     ! 
-    ! write Version 1
+    ! write Version 1 (original version)
     ! 
-    write
+    !write
     
     ! 
-    ! remove baseline and compute rms
+    ! remove baseline and compute rms and write new version
     ! 
     @gildas-class-remove-baseline
-    
-    ! 
-    ! write Version 2
-    ! 
     write
     
     ! 
@@ -138,87 +139,25 @@ FOR i 1 TO found
     NEXT
     
     ! 
-    ! Plot screenshots/checkplots (plot 20 checkplots)
+    ! Store rms into data array, and output to SIC OUTPUT
     ! 
-    IF ((((i*1.0/int(found/20))-int(i*1.0/int(found/20))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
-        hardcopy checkplot_'name'_tagging_'i'.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps"
-    ENDIF
-    
-NEXT
-
-! 
-! Read each spectrum and compute noise by setting a line window
-! 
-FOR i 1 TO found
-    
-    set unit F ! Frequency
-    set plot H ! Histogram
-    
-    !set mode x 352400 353600
-    !set mode y -3 3
-    
-    !get i 2; pl; hardcopy hdcp_'i'_sm2.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm2.eps"
-    !get i 3; pl; hardcopy hdcp_'i'_sm3.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm3.eps"
-    !get i 4; pl; hardcopy hdcp_'i'_sm4.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm4.eps"
-    !get i 5; pl; hardcopy hdcp_'i'_sm5.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm5.eps"
-    !get i 6; pl; hardcopy hdcp_'i'_sm6.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop hdcp_"'i'"_sm6.eps"
-    
-    get i; pl
-    
-    let autotagRSPEC%NCHAN 'R%HEAD%SPE%NCHAN'
-    let autotagRSPEC%RCHAN 'R%HEAD%SPE%RCHAN'
-    let autotagRSPEC%FRES  'R%HEAD%SPE%FRES'
-    let autotagRSPEC%VRES  'R%HEAD%SPE%VRES'
-    let autotagRSPEC%RESTF 'R%HEAD%SPE%RESTF'
-    !<fixed><20170327><dzliu>; let autotagRSPEC%FOFF 'R%HEAD%SPE%FOFF'
-    IF (EXIST(R%HEAD%SPE%FOFF)) THEN
-        let autotagRSPEC%FOFF 'R%HEAD%SPE%FOFF'
-    ELSE
-        let autotagRSPEC%FOFF 0.0
-    ENDIF
-    IF (EXIST(R%HEAD%SPE%VOFF)) THEN
-        let autotagRSPEC%VOFF 'R%HEAD%SPE%VOFF'
-    ELSE
-        let autotagRSPEC%VOFF 0.0
-    ENDIF
-    
-    !<Note> set window only accepts velocity, and needs to set unit V then set unit F back
-    set unit V
-    !<modified><20170327><dzliu>; say window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
-    !<modified><20170327><dzliu>; set window '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(-R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2+autoFlagEdgeChanRight)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2-autoFlagEdgeChanLeft)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(+R%HEAD%SPE%NCHAN*abs(R%HEAD%SPE%FRES)/2)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3-linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF' '(linefreq*1e3+linewidth/2*1e3-R%HEAD%SPE%RESTF-R%HEAD%SPE%FOFF)/abs(R%HEAD%SPE%FRES)*abs(R%HEAD%SPE%VRES)+R%HEAD%SPE%VOFF'
-    let autotagWINDOW[1] '(-autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2                      )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
-    let autotagWINDOW[2] '(-autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2+autoFlagEdgeChanRight)/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
-    let autotagWINDOW[3] '(+autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2-autoFlagEdgeChanLeft )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
-    let autotagWINDOW[4] '(+autotagRSPEC%NCHAN*abs(autotagRSPEC%FRES)/2                      )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
-    let autotagWINDOW[5] '(linefreq*1e3-linewidth/2*1e3-autotagRSPEC%RESTF-autotagRSPEC%FOFF )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
-    let autotagWINDOW[6] '(linefreq*1e3+linewidth/2*1e3-autotagRSPEC%RESTF-autotagRSPEC%FOFF )/abs(autotagRSPEC%FRES)*abs(autotagRSPEC%VRES)+autotagRSPEC%VOFF'
-    say window 'autotagWINDOW[1]' 'autotagWINDOW[2]' 'autotagWINDOW[3]' 'autotagWINDOW[4]' 'autotagWINDOW[5]' 'autotagWINDOW[6]'
-    set window 'autotagWINDOW[1]' 'autotagWINDOW[2]' 'autotagWINDOW[3]' 'autotagWINDOW[4]' 'autotagWINDOW[5]' 'autotagWINDOW[6]'
-    
-    !<Note> plot with frequency axis
-    set unit F
-    draw window
-    base /continuum /pl ! /continuum 
     let autotagVALUE[i] = R%HEAD%BAS%SIGFI
     let autotagNOISE[i] = R%HEAD%BAS%SIGFI
+    say "rms" 'autotagNOISE[i]' "window" 'R%HEAD%BAS%W1[1]' 'R%HEAD%BAS%W2[1]' 'R%HEAD%BAS%W1[2]' 'R%HEAD%BAS%W2[2]' 'R%HEAD%BAS%W1[3]' 'R%HEAD%BAS%W2[3]'
     
-    get i; pl
-    base last /pl
-    draw window
-    draw text 15 3 "rms="'autotagNOISE[i]'
-    
-    say "rms" 'autotagNOISE[i]' "window" 'R%HEAD%BAS%W1[1]' 'R%HEAD%BAS%W1[2]'
-    
-    update
-    
-    ! Plot intermediate screens (plot 20 checkplots)
-    IF ((((i*1.0/int(found/20))-int(i*1.0/int(found/20))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
-        hardcopy checkplot_'name'_tagging_'i'.eps /overwrite; SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps"
+    ! 
+    ! Plot screenshots/checkplots (plot 200 checkplots)
+    ! 
+    IF ((((i*1.0/int(found/200))-int(i*1.0/int(found/200))).EQ.0).OR.(i.EQ.1).OR.(i.EQ.found)) THEN
+        hardcopy checkplot_'name'_tagging_'i'.eps /overwrite
+        SIC\SYSTEM "ps2pdf -dEPSCrop checkplot_"'name'"_tagging_"'i'".eps check_spectra/checkplot_"'name'"_tagging_"'i'".pdf"
+        SIC\SYSTEM "rm checkplot_"'name'"_tagging_"'i'".eps"
     ENDIF
     
 NEXT
 
 SIC OUTPUT
+
 
 ! 
 ! Compute the statistics of autotagNOISE
@@ -228,40 +167,30 @@ COMPUTE autotagmean   MEAN   autotagNOISE
 COMPUTE autotagmedian MEDIAN autotagNOISE
 COMPUTE autotagmin    MIN    autotagNOISE
 COMPUTE autotagmax    MAX    autotagNOISE
-SAY "autotag RMS    'autotagrms'"
-SAY "autotag MEAN   'autotagmean'"
-SAY "autotag MEDIAN 'autotagmedian'"
-SAY "autotag MIN    'autotagmin'"
-SAY "autotag MAX    'autotagmax'"
 
-
-
-! 
-! Prepare output tagged file
-! 
-SIC COPY 'name'.30m 'name'_tagged.30m
-file update 'name'_tagged
-find 
+SIC OUTPUT 'name'_tagging.sum.txt NEW
+SAY "autotag RMS    "'autotagrms'
+SAY "autotag MEAN   "'autotagmean'
+SAY "autotag MEDIAN "'autotagmedian'
+SAY "autotag MIN    "'autotagmin'
+SAY "autotag MAX    "'autotagmax'
+SIC OUTPUT
 
 
 ! 
-! Write output tagged file
+! Tag each spectrum and save into tagged.30m
 ! 
+file in 'name'_tagging
+file out 'name'_tagged single /overwrite
+find /LINE 'linename'
+
 FOR i 1 TO found
     
-    get i
-    
-    ! kill bad channels at the edges
-    !!for j 1 TO 66 'R%HEAD%SPE%NCHAN-65' TO 'R%HEAD%SPE%NCHAN' 
-    !!    draw kill j
-    !!next
-    
-    ! tag the quality
-    !!IF ((int(autotagVALUE[i]/autotagmedian*4.0)).LT.8) THEN
-    !!    tag 'int(autotagVALUE[i]/autotagmedian*4.0)'
-    !!ELSE
-    !!    tag 8
-    !!ENDIF
+    IF (i.EQ.1) THEN 
+        get f
+    ELSE 
+        get n
+    ENDIF
     
     ! 
     ! tag the quality <20160701> by rms noise distribution
@@ -286,10 +215,10 @@ FOR i 1 TO found
         tag 8
     ENDIF
     
-    update
+    write
     
-    set mode y auto
-    set mode x auto
+    !set mode y auto
+    !set mode x auto
     
 NEXT
 
@@ -297,17 +226,11 @@ NEXT
 ! 
 ! Write output averaged file
 ! 
-file in 'name'_tagged
-file out 'name'_tagged_averaged_quality_6 single /overwrite
-find /quality 6
+!file in 'name'_tagged
+!file out 'name'_tagged_averaged_quality_6 single /overwrite
+!find /quality 6
 !consistency
 !average
-
-
-
-!file in 'name'_tagged
-!file out 'name'_tagged_averaged_quality_4 single /overwrite
-!find /quality 4
 
 
 

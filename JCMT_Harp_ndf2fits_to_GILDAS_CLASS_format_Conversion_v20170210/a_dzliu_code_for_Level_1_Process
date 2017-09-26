@@ -165,6 +165,8 @@ echo "cp \"$(dirname ${BASH_SOURCE[0]})/gildas-class-autotag.greg\" \"${Output_D
       cp  "$(dirname ${BASH_SOURCE[0]})/gildas-class-autotag.greg"   "${Output_Dir}Scan_merged/"
 echo "cp \"$(dirname ${BASH_SOURCE[0]})/gildas-class-autoxymap.class\" \"${Output_Dir}Scan_merged/\""
       cp  "$(dirname ${BASH_SOURCE[0]})/gildas-class-autoxymap.class"   "${Output_Dir}Scan_merged/"
+echo "cp \"$(dirname ${BASH_SOURCE[0]})/gildas-class-remove-baseline.class\" \"${Output_Dir}Scan_merged/\""
+      cp  "$(dirname ${BASH_SOURCE[0]})/gildas-class-remove-baseline.class"   "${Output_Dir}Scan_merged/"
 
 echo "! "                                >  "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
 echo "! Plot spectra in Scan_merged.30m" >> "${Output_Dir}Scan_merged/do_gildas_class_spec_plot.class"
@@ -175,6 +177,7 @@ echo ""                                  >> "${Output_Dir}Scan_merged/do_gildas_
 echo "! "                                                                      >  "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
 echo "! Autotag spectra in Scan_merged.30m"                                    >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
 echo "LET NAME Scan_merged"                                                    >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
+echo "LET LINE $Line_LineName"                                                 >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
 echo "LET FREQUENCY $Line_ObsvFreq ! expected line observing freuency in GHz"  >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
 echo "LET VELOCITY $Line_VelWidth ! expected line velocity width in km/s"      >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
 echo "@gildas-class-autotag"                                                   >> "${Output_Dir}Scan_merged/do_gildas_class_spec_tag.class"
